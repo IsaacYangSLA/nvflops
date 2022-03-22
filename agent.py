@@ -48,7 +48,7 @@ class TrackerAgent:
         self._heartbeat_interval = heartbeat_interval
         self.go = True
         self.stop = False
-        self._last_submission_id = "a2cd11b9-9191-415d-bbac-8a0bc1f898a6"
+        self._last_submission_id = "eb8470a8-7797-40a9-be36-47b41c62debb"
 
     def _send(
         self, api_point, headers: Optional[Dict[str, Any]] = None, payload: Optional[Dict[str, Any]] = None
@@ -88,8 +88,8 @@ class TrackerAgent:
 
     def submit(self, parent_id_list, meta, blob):
         resp = self.submit_meta(parent_id_list, meta)
-        self._last_submission_id = resp.get("submission_id")
-        blob_id = resp.get("blob_id")
+        self._last_submission = resp.get("submission")
+        blob_id = self._last_submission.get("blob_id")
         # print(list(client.list_objects("test")))
         self._blob_client.put_object(self._bucket_name, blob_id, io.BytesIO(blob), len(blob))
 
