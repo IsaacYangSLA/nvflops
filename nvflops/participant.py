@@ -57,7 +57,7 @@ def main():
         time.sleep(4)
         print("first submission not available")
     for i in range(5):
-        submissions_to_work = tracker_agent.get_submission().get("children", [])
+        submissions_to_work = tracker_agent.get_submission().get("child_list", [])
         blob_id_list = list()
         parent_id_list = list()
         for sub in submissions_to_work:

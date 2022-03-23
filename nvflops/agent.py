@@ -37,14 +37,10 @@ class TrackerAgent:
         self._ca_path = None
         self._cert_path = None
         self._prv_key_path = None
-        self._last_service_session_id = ""
         self._asked_to_exit = False
         self._logger = logging.getLogger(self.__class__.__name__)
         self._retry_delay = 4
         self._asked_to_stop_retrying = False
-        self._overseer_info = {}
-        self._update_callback = None
-        self._conditional_cb = False
         self._heartbeat_interval = heartbeat_interval
         self.go = True
         self.stop = False
@@ -83,12 +79,9 @@ class TrackerAgent:
         if update_callback:
             self._update_callback = update_callback
         self.get_pangu()
-        # self._report_and_query.start()
-        # self._flag.set()
-        # self._blob_client = minio.Minio("127.0.0.1:9000", secure=False)
 
-    def get_pangu(self):
-        api_end_point = self._tracker_end_point + "/pangu"
+    def get_root(self):
+        api_end_point = self._tracker_end_point + "/root"
         req = Request("GET", api_end_point, json=None, headers=None)
         prepared = self._session.prepare_request(req)
         resp = self._session.send(prepared)
@@ -98,8 +91,8 @@ class TrackerAgent:
         resp = self.submit_meta(parent_id_list, meta)
         self._last_submission = resp.get("submission")
         blob_id = self._last_submission.get("blob_id")
-        # print(list(client.list_objects("test")))
         self._blob_client.put_object(self._bucket_name, blob_id, io.BytesIO(blob), len(blob))
+        self._last_submission_id = self._last_submission.get("id")
 
     def submit_meta(self, parent_id_list, meta, headers=None) -> Dict[str, Any]:
         custom_field = dict()
@@ -111,7 +104,7 @@ class TrackerAgent:
         return resp.json()
 
     def get_submission(self):
-        api_end_point = self._tracker_end_point + f"/submission/{self._last_submission_id}/children"
+        api_end_point = self._tracker_end_point + f"/submission/{self._last_submission_id}/child"
         req = Request("GET", api_end_point, json=dict(), headers=None)
         prepared = self._session.prepare_request(req)
         resp = self._session.send(prepared)
@@ -119,39 +112,3 @@ class TrackerAgent:
 
     def get_blob(self, blob_id):
         return self._blob_client.get_object(self._bucket_name, blob_id)
-
-    def pause(self):
-        self._asked_to_stop_retrying = True
-        self._flag.clear()
-
-    def resume(self):
-        self._asked_to_stop_retrying = False
-        self._flag.set()
-
-    def end(self):
-        self._flag.set()
-        self._asked_to_exit = True
-        self._report_and_query.join()
-
-    def _do_callback(self):
-        if self._update_callback:
-            self._update_callback(self)
-
-    def _handle_ssid(self, ssid):
-        if not self.conditional_cb or self._last_service_session_id != ssid:
-            self._last_service_session_id = ssid
-            self._do_callback()
-
-    def _prepare_data(self):
-        data = dict(role=self._role, project=self._project)
-        return data
-
-    def _rnq_worker(self):
-        data = self._prepare_data()
-        if self._role == "server":
-            data["sp_end_point"] = self._sp_end_point
-        api_point = self._overseer_end_point + "/heartbeat"
-        while not self._asked_to_exit:
-            self._flag.wait()
-            self._rnq(api_point, headers=None, data=data)
-            time.sleep(self._heartbeat_interval)

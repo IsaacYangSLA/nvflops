@@ -6,6 +6,8 @@ import uuid
 from flask import jsonify, request, Flask, json
 from flask.json import JSONEncoder
 
+from .cert_utils import SimpleCert
+
 app = Flask(__name__)
 app.config["APPLICATION_ROOT"] = "/api/v1"
 from flask_sqlalchemy import SQLAlchemy
@@ -43,8 +45,8 @@ class TimestampMixin(object):
 
 parents_table = db.Table(
     "parents_table",
-    db.Column("parent_id", db.String(40), db.ForeignKey("submission.id"), primary_key=True),
-    db.Column("child_id", db.String(40), db.ForeignKey("submission.id"), primary_key=True),
+    db.Column("parent_id", db.String(40), db.ForeignKey("submission.id")),
+    db.Column("child_id", db.String(40), db.ForeignKey("submission.id")),
 )
 
 class CustomField(db.Model):
@@ -57,9 +59,15 @@ class CustomField(db.Model):
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+class Certificate(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    issuer = db.Column(db.String(40))
+    subject = db.Column(db.String(40))
+    s_crt = db.Column(db.String(2000))
+    s_prv = db.Column(db.String(2000))
+
 class Submission(TimestampMixin, db.Model):
     id = db.Column(db.String(40), primary_key=True)
-    pangu = db.Column(db.Boolean, default=False)
     description = db.Column(db.String(400))
     creator = db.Column(db.String(40))
     state = db.Column(db.String(10), nullable=False)
@@ -96,9 +104,6 @@ def submission():
     if parent_id_list:
         for parent_id in parent_id_list:
             submission.parents.append(Submission.query.get(parent_id))
-    else:
-        submission.parents.append(submission)
-        submission.pangu = True
     for k, v in custom_field.items():
         cf = CustomField(key_name=k, value_type=v.__class__.__name__, value_string=str(v), submission_id=id)
         db.session.add(cf)
@@ -106,6 +111,26 @@ def submission():
     db.session.commit()
     return jsonify({"status":"success", "submission": submission})
 
+
+@app.route("/api/v1/provision", methods=["POST"])
+def provision():
+    req = request.json
+    issuer = req.get("issuer")
+    subject = req.get("subject")
+    if issuer is None:
+        issuer = subject
+        my_cert = SimpleCert(subject, ca=True)
+    else:
+        _cert = Certificate.query.filter_by(subject=issuer).first()
+        root = SimpleCert(subject, ca=True, s_crt=_cert.s_crt, s_prv=_cert.s_prv)
+        my_cert = SimpleCert(subject)
+        my_cert.set_issuer_simple_cert(root)
+    my_cert.create_cert()
+    my_cert.serialize()
+    _cert = Certificate(issuer=issuer, subject=subject, s_crt=my_cert.s_crt, s_prv=my_cert.s_prv)
+    db.session.add(_cert)
+    db.session.commit()
+    return jsonify({"status":"success", "certificate": {"cert": my_cert.s_crt.decode('utf-8'), "key": my_cert.s_prv.decode('utf-8')}})
 
 
 @app.route("/api/v1/submission/<s_id>/custom_field")
@@ -123,24 +148,24 @@ def get_custom_field(s_id):
             custom_field[cf.key_name] = cf.value_string
     return jsonify({"status":"success", "custom_field": custom_field})
 
-@app.route("/api/v1/submission/<s_id>/parents")
+@app.route("/api/v1/submission/<s_id>/parent")
 def parents(s_id):
     parent_list = Submission.query.get(s_id).parents
     # return jsonify({"parents": [p.asdict() for p in parent_list]})
     return jsonify({"status":"success", "parent_list": parent_list})
 
 
-@app.route("/api/v1/submission/<s_id>/children")
+@app.route("/api/v1/submission/<s_id>/child")
 def children(s_id):
     # child_id_list = [c.id for c in Submission.query.get(id).children]
     # return jsonify({"parents": [p.asdict() for p in parent_list]})
     return jsonify({"status":"success", "child_list": Submission.query.get(s_id).children})
 
 
-@app.route("/api/v1/pangu")
-def get_pangu():
-    q = Submission.query
-    f = q.filter_by(pangu=True).first()
+@app.route("/api/v1/root")
+def get_root():
+    q = Submission.query.filter(~Submission.parents.any())
+    f = q.first()
     return jsonify({"status":"success", "id": f.id})
 
 @app.route("/api/v1/refresh")
