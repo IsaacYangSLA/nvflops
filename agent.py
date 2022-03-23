@@ -48,7 +48,7 @@ class TrackerAgent:
         self._heartbeat_interval = heartbeat_interval
         self.go = True
         self.stop = False
-        self._last_submission_id = "eb8470a8-7797-40a9-be36-47b41c62debb"
+        self._last_submission_id = ""
 
     def _send(
         self, api_point, headers: Optional[Dict[str, Any]] = None, payload: Optional[Dict[str, Any]] = None
@@ -82,9 +82,17 @@ class TrackerAgent:
         self._blob_client = minio.Minio(self._blob_end_point, secure=False)
         if update_callback:
             self._update_callback = update_callback
+        self.get_pangu()
         # self._report_and_query.start()
         # self._flag.set()
         # self._blob_client = minio.Minio("127.0.0.1:9000", secure=False)
+
+    def get_pangu(self):
+        api_end_point = self._tracker_end_point + "/pangu"
+        req = Request("GET", api_end_point, json=None, headers=None)
+        prepared = self._session.prepare_request(req)
+        resp = self._session.send(prepared)
+        self._last_submission_id = resp.json().get("id")
 
     def submit(self, parent_id_list, meta, blob):
         resp = self.submit_meta(parent_id_list, meta)
@@ -103,7 +111,7 @@ class TrackerAgent:
         return resp.json()
 
     def get_submission(self):
-        api_end_point = self._tracker_end_point + f"/{self._last_submission_id}/children"
+        api_end_point = self._tracker_end_point + f"/submission/{self._last_submission_id}/children"
         req = Request("GET", api_end_point, json=dict(), headers=None)
         prepared = self._session.prepare_request(req)
         resp = self._session.send(prepared)

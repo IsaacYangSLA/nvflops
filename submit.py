@@ -37,7 +37,7 @@ def get_all(api_end_point):
     return resp.json()
 
 random_keys = ["foo", "bar", "abc", "xyz"]
-random_values = [1, 1.0, "string", True]
+random_values = [1, 1.0, "value", True]
 for i in range(30):
     all_submission = get_all("http://tinylaptop:8000/api/v1/list").get("submission_list")
     all_id = [sub["id"] for sub in all_submission]
