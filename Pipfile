@@ -9,6 +9,7 @@ boto3 = "*"
 flask-sqlalchemy = "*"
 minio = "*"
 requests = "*"
+flask-migrate = "*"
 
 [dev-packages]
 pipenv-setup = {extras = ["block"], version = "*"}

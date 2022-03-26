@@ -16,7 +16,7 @@ setup(
     name=package_name,
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
-    description="New Version of Free-style machine-Learning Open Platform System",
+    description="The New Version of the Free-style machine-Learning Open Platform System",
     url="https://github.com/IsaacYangSLA/nvflops",
     package_dir={"nvflops": "nvflops"},
     packages=find_packages(

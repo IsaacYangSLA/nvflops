@@ -9,4 +9,4 @@ The **N**ew **V**ersion of the **F**ree-style machine-**L**earning **O**pen **P*
 - Results can include additional metadata (custom_field) as flat dictionary.  Search can perform against those custom_field.
 
 Aggregation style operation as shown in this graph.
-![alt text](https://github.com/IsaacYangSLA/nvflops/blob/main/key_concepts.png?raw=true)
+![alt text](https://github.com/IsaacYangSLA/nvflops/blob/main/docs/resources/key_concepts.png?raw=true)

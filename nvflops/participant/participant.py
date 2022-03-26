@@ -1,24 +1,19 @@
 import argparse
-from pprint import pprint
-
 import datetime
 import io
-import random
-import uuid
-import minio
-
-from typing import Any, Dict, Optional
-
-from requests import Request, Session
-from requests.adapters import HTTPAdapter
-
 import logging
+import random
 import threading
 import time
+import uuid
+from pprint import pprint
 from typing import Any, Dict, Optional
-from agent import TrackerAgent
+
+import minio
 from requests import Request, RequestException, Session, codes
 from requests.adapters import HTTPAdapter
+
+from nvflops.agent.agent import TrackerAgent
 
 
 def setup_basic_info():
