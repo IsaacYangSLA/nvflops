@@ -36,6 +36,7 @@ class Certificate(TimestampMixin, db.Model):
 
 class Submission(TimestampMixin, db.Model):
     id = db.Column(db.String(40), primary_key=True)
+    study = db.Column(db.String(40))
     description = db.Column(db.String(400))
     creator = db.Column(db.String(40))
     state = db.Column(db.String(10), nullable=False)

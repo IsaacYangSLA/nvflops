@@ -13,6 +13,7 @@ flask-migrate = "*"
 
 [dev-packages]
 pipenv-setup = {extras = ["block"], version = "*"}
+nvflops = {editable = true, path = "."}
 
 [requires]
 python_version = "3.8"

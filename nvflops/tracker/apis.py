@@ -18,11 +18,13 @@ def submit():
     if request.method == "GET":
         return jsonify({"status": "success", "submission_list": Submission.query.all()})
     req = request.json
+    print(f"{req=}")
     id = str(uuid.uuid4())
     blob_id = str(uuid.uuid4())
     custom_field = req.get("custom_field", {})
     req.pop("custom_field", None)
     parent_id_list = req.get("parent_id_list", [])
+    print(f"submitted {parent_id_list=}")
     req.pop("parent_id_list", None)
     submission = Submission(id=id, blob_id=blob_id, state="registered", **req)
     if parent_id_list:
@@ -33,6 +35,7 @@ def submit():
         db.session.add(cf)
     db.session.add(submission)
     db.session.commit()
+    print(f"returned submission {submission=}")
     return jsonify({"status": "success", "submission": submission})
 
 
@@ -68,8 +71,13 @@ def children(s_id):
 
 @submission.route("/root")
 def get_root():
-    q = Submission.query.filter(~Submission.parents.any())
-    f = q.first()
+    req = request.json
+    study = req.get("study", "")
+    # q = Submission.query.filter_by(study=study).filter(~Submission.parents.any())
+    # f = q.first()
+    q = Submission.query.filter_by(study=study)
+    f = q.order_by(Submission.created_at.desc()).first()
+    print(f"root returns {f.id}")
     return jsonify({"status": "success", "id": f.id})
 
 
@@ -128,8 +136,9 @@ def heartbeat():
         db.session.add(cf)
     db.session.commit()
     plan = Plan.query.order_by(Plan.id.desc()).first()
+    print(plan)
     if plan:
-        return jsonify({"status": "success", "action": plan.action})
+        return jsonify({"status": "success", "action": plan.action, "study": plan.study})
     else:
         return jsonify({"status": "success"})
 
