@@ -20,12 +20,14 @@ def serialize_cert(cert):
 
 
 class SimpleCert(object):
-    def __init__(self, subject:str, ca=False, s_crt=None, s_prv=None):
+    def __init__(self, subject: str, ca=False, s_crt=None, s_prv=None):
         self.ca = ca
         self.s_crt = s_crt
         self.s_prv = s_prv
         self.crt = x509.load_pem_x509_certificate(s_crt, default_backend()) if s_crt else None
-        self.prv = serialization.load_pem_private_key(s_prv, password=None, backend=default_backend()) if s_prv else None
+        self.prv = (
+            serialization.load_pem_private_key(s_prv, password=None, backend=default_backend()) if s_prv else None
+        )
         self.subject = subject
         self.issuer_simple_cert = None
 
@@ -52,7 +54,11 @@ class SimpleCert(object):
         if self.s_prv is None:
             self.s_prv = serialize_pri_key(self.prv)
         self.s_pfx = serialization.pkcs12.serialize_key_and_certificates(
-            self.subject.encode("utf-8"), self.prv, self.crt, None, serialization.BestAvailableEncryption(self.subject.encode("utf-8"))
+            self.subject.encode("utf-8"),
+            self.prv,
+            self.crt,
+            None,
+            serialization.BestAvailableEncryption(self.subject.encode("utf-8")),
         )
 
     def get_pri_key_cert(self, participant):

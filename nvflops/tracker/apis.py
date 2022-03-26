@@ -12,16 +12,17 @@ s3 = Blueprint("s3", __name__, url_prefix="/api/v1/s3")
 admin = Blueprint("admin", __name__, url_prefix="/api/v1/admin")
 routine = Blueprint("routine", __name__, url_prefix="/api/v1/routine")
 
+
 @submission.route("", methods=["GET", "POST"])
 def submit():
     if request.method == "GET":
-        return jsonify({"status":"success", "submission_list": Submission.query.all()})
+        return jsonify({"status": "success", "submission_list": Submission.query.all()})
     req = request.json
     id = str(uuid.uuid4())
     blob_id = str(uuid.uuid4())
     custom_field = req.get("custom_field", {})
     req.pop("custom_field", None)
-    parent_id_list = req.get("parent_id_list",[])
+    parent_id_list = req.get("parent_id_list", [])
     req.pop("parent_id_list", None)
     submission = Submission(id=id, blob_id=blob_id, state="registered", **req)
     if parent_id_list:
@@ -32,7 +33,7 @@ def submit():
         db.session.add(cf)
     db.session.add(submission)
     db.session.commit()
-    return jsonify({"status":"success", "submission": submission})
+    return jsonify({"status": "success", "submission": submission})
 
 
 @submission.route("/<s_id>/custom_field")
@@ -41,35 +42,35 @@ def get_custom_field(s_id):
     custom_field = dict()
     for cf in custom_field_list:
         if cf.value_type == "bool":
-            custom_field[cf.key_name] = True if cf.value_string=="True" else False
+            custom_field[cf.key_name] = True if cf.value_string == "True" else False
         elif cf.value_type == "int":
             custom_field[cf.key_name] = int(cf.value_string)
         elif cf.value_type == "float":
             custom_field[cf.key_name] = float(cf.value_string)
         else:
             custom_field[cf.key_name] = cf.value_string
-    return jsonify({"status":"success", "custom_field": custom_field})
+    return jsonify({"status": "success", "custom_field": custom_field})
 
 
 @submission.route("/<s_id>/parent")
 def parents(s_id):
     parent_list = Submission.query.get(s_id).parents
     # return jsonify({"parents": [p.asdict() for p in parent_list]})
-    return jsonify({"status":"success", "parent_list": parent_list})
+    return jsonify({"status": "success", "parent_list": parent_list})
 
 
 @submission.route("/<s_id>/child")
 def children(s_id):
     # child_id_list = [c.id for c in Submission.query.get(id).children]
     # return jsonify({"parents": [p.asdict() for p in parent_list]})
-    return jsonify({"status":"success", "child_list": Submission.query.get(s_id).children})
+    return jsonify({"status": "success", "child_list": Submission.query.get(s_id).children})
 
 
 @submission.route("/root")
 def get_root():
     q = Submission.query.filter(~Submission.parents.any())
     f = q.first()
-    return jsonify({"status":"success", "id": f.id})
+    return jsonify({"status": "success", "id": f.id})
 
 
 @admin.route("/provision", methods=["POST"])
@@ -90,7 +91,13 @@ def provision():
     _cert = Certificate(issuer=issuer, subject=subject, s_crt=my_cert.s_crt, s_prv=my_cert.s_prv)
     db.session.add(_cert)
     db.session.commit()
-    return jsonify({"status":"success", "certificate": {"cert": my_cert.s_crt.decode('utf-8'), "key": my_cert.s_prv.decode('utf-8')}})
+    return jsonify(
+        {
+            "status": "success",
+            "certificate": {"cert": my_cert.s_crt.decode("utf-8"), "key": my_cert.s_prv.decode("utf-8")},
+        }
+    )
+
 
 @admin.route("/refresh")
 def refresh():
@@ -98,13 +105,15 @@ def refresh():
     db.create_all()
     return jsonify({"status": "success"})
 
+
 @admin.route("/plan", methods=["POST"])
 def add_plan():
     req = request.json
     plan = Plan(**req)
     db.session.add(plan)
     db.session.commit()
-    return jsonify({"status":"success", "plan": plan})
+    return jsonify({"status": "success", "plan": plan})
+
 
 @routine.route("/heartbeat", methods=["POST"])
 def heartbeat():
@@ -120,7 +129,7 @@ def heartbeat():
     db.session.commit()
     plan = Plan.query.order_by(Plan.id.desc()).first()
     if plan:
-        return jsonify({"status": "success", "action":plan.action})
+        return jsonify({"status": "success", "action": plan.action})
     else:
         return jsonify({"status": "success"})
 

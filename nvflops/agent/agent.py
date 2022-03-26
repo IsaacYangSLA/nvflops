@@ -17,9 +17,9 @@ class TrackerAgent:
         blob_end_point,
         bucket_name,
         name: str,
-        project = "prj1",
-        study = "study1",
-        experiment = "exp1",
+        project="prj1",
+        study="study1",
+        experiment="exp1",
         heartbeat_interval=5,
     ):
         self._project = project
@@ -139,6 +139,6 @@ class TrackerAgent:
         self._tracker_plan = resp.json()
         action = self._tracker_plan.get("action")
         if action == "go":
-            self.go=True
+            self.go = True
         elif action == "exit":
             self._asked_to_exit = True

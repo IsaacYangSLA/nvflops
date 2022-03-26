@@ -14,6 +14,7 @@ parents_table = db.Table(
     db.Column("child_id", db.String(40), db.ForeignKey("submission.id")),
 )
 
+
 class CustomField(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     submission_id = db.Column(db.String(40), db.ForeignKey("submission.id"), nullable=False)
@@ -24,12 +25,14 @@ class CustomField(db.Model):
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+
 class Certificate(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     issuer = db.Column(db.String(40))
     subject = db.Column(db.String(40))
     s_crt = db.Column(db.String(2000))
     s_prv = db.Column(db.String(2000))
+
 
 class Submission(TimestampMixin, db.Model):
     id = db.Column(db.String(40), primary_key=True)
@@ -53,6 +56,7 @@ class Submission(TimestampMixin, db.Model):
     def __repr__(self):
         return str(self.asdict())
 
+
 class Plan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     action = db.Column(db.String(10))
@@ -63,6 +67,7 @@ class Plan(db.Model):
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+
 class VitalSign(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     heartbeat_id = db.Column(db.Integer, db.ForeignKey("heartbeat.id"), nullable=False)
@@ -72,6 +77,7 @@ class VitalSign(db.Model):
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 
 class Heartbeat(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -8,6 +8,7 @@ from .config import config
 
 db = SQLAlchemy()
 
+
 class CustomJSONEncoder(JSONEncoder):
     def default(self, obj):
         try:
@@ -22,6 +23,7 @@ class CustomJSONEncoder(JSONEncoder):
             return list(iterable)
         return JSONEncoder.default(self, obj)
 
+
 def create_app(config_name):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
@@ -31,6 +33,7 @@ def create_app(config_name):
     db.init_app(app)
     with app.app_context():
         from .apis import admin, routine, s3, submission
+
         app.register_blueprint(submission)
         app.register_blueprint(admin)
         app.register_blueprint(s3)

@@ -4,7 +4,7 @@ from . import create_app
 
 # from tracker.models import User
 
-app = create_app('development')
+app = create_app("development")
 # migrate = Migrate(app, db)
 
 # @app.shell_context_processor
