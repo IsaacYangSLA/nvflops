@@ -10,6 +10,8 @@ flask-sqlalchemy = "*"
 minio = "*"
 requests = "*"
 flask-migrate = "*"
+nvflops = {editable = true, path = "."}
+psutil = "*"
 
 [dev-packages]
 pipenv-setup = {extras = ["block"], version = "*"}
