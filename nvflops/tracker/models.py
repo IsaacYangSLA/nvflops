@@ -7,6 +7,11 @@ class TimestampMixin(object):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
+class CustomFieldMixin(object):
+    id = db.Column(db.Integer, primary_key=True)
+    key_name = db.Column(db.String(40))
+    value_type = db.Column(db.String(40))
+    value_string = db.Column(db.String(40))
 
 parents_table = db.Table(
     "parents_table",
@@ -14,13 +19,8 @@ parents_table = db.Table(
     db.Column("child_id", db.String(40), db.ForeignKey("submission.id")),
 )
 
-
-class CustomField(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+class SubmissionCustomField(CustomFieldMixin, db.Model):
     submission_id = db.Column(db.String(40), db.ForeignKey("submission.id"), nullable=False)
-    key_name = db.Column(db.String(40))
-    value_type = db.Column(db.String(40))
-    value_string = db.Column(db.String(40))
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -49,7 +49,7 @@ class Submission(TimestampMixin, db.Model):
         lazy=False,
         backref=db.backref("children"),
     )
-    custom_field_list = db.relationship("CustomField", lazy=True, backref=db.backref("submission"))
+    custom_field_list = db.relationship("SubmissionCustomField", lazy=True, backref=db.backref("submission"))
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -69,24 +69,20 @@ class Plan(db.Model):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
-class VitalSign(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    heartbeat_id = db.Column(db.Integer, db.ForeignKey("heartbeat.id"), nullable=False)
-    key_name = db.Column(db.String(40))
-    value_type = db.Column(db.String(40))
-    value_string = db.Column(db.String(40))
+class VitalSignCustomField(CustomFieldMixin, db.Model):
+    vital_sign_id = db.Column(db.Integer, db.ForeignKey("vital_sign.id"), nullable=False)
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
-class Heartbeat(TimestampMixin, db.Model):
+class VitalSign(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project = db.Column(db.String(40))
     study = db.Column(db.String(40))
     experiment = db.Column(db.String(40))
-    reporter = db.Column(db.String(40))
-    vital_sign = db.relationship("VitalSign", lazy=True, backref=db.backref("heartbeat"))
+    subject = db.Column(db.String(40))
+    custom_field_list = db.relationship("VitalSignCustomField", lazy=True, backref=db.backref("vital_sign"))
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
