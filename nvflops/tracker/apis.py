@@ -13,7 +13,7 @@ def submit():
         return jsonify({"status": "success", "list": SubmissionManager.get_all()})
     req = request.json
     print(f"{req=}")
-    submission = SubmissionManager.store_new_entry(req)
+    submission = SubmissionManager.store_new_entry(**req)
     print(f"returned submission {submission=}")
     return jsonify({"status": "success", "submission": submission})
 
@@ -70,14 +70,14 @@ def refresh():
 @admin.route("/plan", methods=["POST"])
 def add_plan():
     req = request.json
-    plan = PlanManager.store_new_entry(req)
+    plan = PlanManager.store_new_entry(**req)
     return jsonify({"status": "success", "plan": plan})
 
 
 @routine.route("/vital_sign", methods=["POST"])
 def vital_sign():
     req = request.json
-    VitalSignManager.store_new_entry(req)
+    VitalSignManager.store_new_entry(**req)
     plan = PlanManager.get_last_plan()
     print(plan)
     if plan:

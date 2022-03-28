@@ -98,7 +98,7 @@ class CertManager():
     
 class SystemManager():
     @staticmethod
-    def init_backend(self):
+    def init_backend():
         db.drop_all()
         db.create_all()
         return True

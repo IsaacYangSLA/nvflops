@@ -91,11 +91,14 @@ class TrackerAgent:
             self.submit([], {}, "starting_blob".encode("utf-8"))
             print(f"Initial submssion sent.  Tracker accepted with id={self._last_submission_id}")
         elif self._role == "trainer":
-            first_submission_to_work = self.get_root()
-            first_sub_id = first_submission_to_work.get("id")
-            print(f"Initial aggregation download id={first_sub_id}, working on it")
+            root_sub = self.get_root().get("submission", {})
+            root_sub_id = root_sub.get("id")
+            if root_sub is None:
+                print("No root sub found???")
+                return
+            print(f"Initial aggregation download id={root_sub_id}, working on it")
             time.sleep(4)
-            self.submit(parent_id_list=[first_sub_id], meta={}, blob="first_trained_blob".encode("utf-8"))
+            self.submit(parent_id_list=[root_sub_id], meta={}, blob="first_trained_blob".encode("utf-8"))
             print(f"First trained result sent.  Tracker accepted with id={self._last_submission_id}")
 
     def get_root(self):
@@ -134,12 +137,12 @@ class TrackerAgent:
         return self._blob_client.get_object(self._bucket_name, blob_id)
 
     def _prepare_data(self):
-        data = dict(project=self._project, study=self._study, experiment=self._experiment, reporter=self._name)
+        data = dict(project=self._project, study=self._study, experiment=self._experiment, subject=self._name)
         return data
 
     def _rnq_worker(self):
         data = self._prepare_data()
-        api_point = self._tracker_end_point + "/routine/heartbeat"
+        api_point = self._tracker_end_point + "/routine/vital_sign"
         while not self._asked_to_exit:
             self._flag.wait()
             mem = psutil.virtual_memory()
