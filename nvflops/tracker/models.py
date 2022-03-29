@@ -12,6 +12,8 @@ class CustomFieldMixin(object):
     key_name = db.Column(db.String(40))
     value_type = db.Column(db.String(40))
     value_string = db.Column(db.String(40))
+    def __repr__(self):
+        return str(self.asdict())
 
 parents_table = db.Table(
     "parents_table",
@@ -19,12 +21,17 @@ parents_table = db.Table(
     db.Column("child_id", db.String(40), db.ForeignKey("submission.id")),
 )
 
-class SubmissionCustomField(CustomFieldMixin, db.Model):
-    submission_id = db.Column(db.String(40), db.ForeignKey("submission.id"), nullable=False)
-
+class Tenant(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project = db.Column(db.String(40))
+    study = db.Column(db.String(40))
+    experiment = db.Column(db.String(40))
+    certificates = db.relationship("Certificate", lazy=True, backref="tenant")
+    submissions = db.relationship("Submission", lazy=True, backref="tenant")
+    plans = db.relationship("Plan", lazy=True, backref="tenant")
+    vital_signs = db.relationship("VitalSign", lazy=True, backref="tenant")
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
 
 class Certificate(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -32,11 +39,12 @@ class Certificate(TimestampMixin, db.Model):
     subject = db.Column(db.String(40))
     s_crt = db.Column(db.String(2000))
     s_prv = db.Column(db.String(2000))
-
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=False)
+    def asdict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class Submission(TimestampMixin, db.Model):
     id = db.Column(db.String(40), primary_key=True)
-    study = db.Column(db.String(40))
     description = db.Column(db.String(400))
     creator = db.Column(db.String(40))
     state = db.Column(db.String(10), nullable=False)
@@ -50,42 +58,32 @@ class Submission(TimestampMixin, db.Model):
         backref=db.backref("children"),
     )
     custom_field_list = db.relationship("SubmissionCustomField", lazy=True, backref=db.backref("submission"))
-
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=False)
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
-    def __repr__(self):
-        return str(self.asdict())
+class SubmissionCustomField(CustomFieldMixin, db.Model):
+    submission_id = db.Column(db.String(40), db.ForeignKey("submission.id"), nullable=False)
+    def asdict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
-
-class Plan(db.Model):
+class Plan(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     action = db.Column(db.String(10))
-    project = db.Column(db.String(40))
-    study = db.Column(db.String(40))
-    experiment = db.Column(db.String(40))
-
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=False)
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
 
 class VitalSignCustomField(CustomFieldMixin, db.Model):
     vital_sign_id = db.Column(db.Integer, db.ForeignKey("vital_sign.id"), nullable=False)
-
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
 
 class VitalSign(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    project = db.Column(db.String(40))
-    study = db.Column(db.String(40))
-    experiment = db.Column(db.String(40))
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=False)
     subject = db.Column(db.String(40))
     custom_field_list = db.relationship("VitalSignCustomField", lazy=True, backref=db.backref("vital_sign"))
-
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
-    def __repr__(self):
-        return str(self.asdict())

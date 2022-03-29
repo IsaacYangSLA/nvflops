@@ -50,9 +50,9 @@ def get_root():
 @admin.route("/provision", methods=["POST"])
 def provision():
     req = request.json
-    issuer = req.get("issuer")
-    subject = req.get("subject")
-    cert = CertManager.store_new_entry(issuer, subject)
+    issuer = req.pop("issuer", None)
+    subject = req.pop("subject", "")
+    cert = CertManager.store_new_entry(issuer, subject, **req)
     return jsonify(
         {
             "status": "success",
@@ -79,9 +79,8 @@ def vital_sign():
     req = request.json
     VitalSignManager.store_new_entry(**req)
     plan = PlanManager.get_last_plan()
-    print(plan)
     if plan:
-        return jsonify({"status": "success", "action": plan.action, "study": plan.study})
+        return jsonify({"status": "success", "action": plan.action, "study": plan.tenant.study})
     else:
         return jsonify({"status": "success"})
 

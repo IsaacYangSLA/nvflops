@@ -2,7 +2,7 @@ import uuid
 
 from ..utils.cert_utils import SimpleCert
 from . import db
-from .models import Certificate, SubmissionCustomField, Plan, Submission, VitalSign, VitalSignCustomField
+from .models import Certificate, SubmissionCustomField, Plan, Submission, VitalSign, VitalSignCustomField, Tenant
 
 def get_custom_field(model, id):
     cf_list = model.query.get(id).custom_field_list
@@ -18,16 +18,32 @@ def get_custom_field(model, id):
             custom_field[cf.key_name] = cf.value_string
     return custom_field
 
+def get_or_create(session, model, **kwargs):
+    instance = session.query(model).filter_by(**kwargs).first()
+    if instance:
+        return instance
+    else:
+        instance = model(**kwargs)
+        session.add(instance)
+        session.commit()
+        return instance
+
+def get_tenant(**kwargs):
+    project = kwargs.pop("project","proj1")
+    study = kwargs.pop("study","study1")
+    experiment = kwargs.pop("experiment","exp1")
+    tenant = get_or_create(db.session, Tenant, project=project, study=study, experiment=experiment)
+    return (tenant, kwargs)
+
 class SubmissionManager():
     @staticmethod
     def store_new_entry(**kwargs):
+        (tenant, kwargs) = get_tenant(**kwargs)
         id = str(uuid.uuid4())
         blob_id = str(uuid.uuid4())
-        custom_field = kwargs.get("custom_field", {})
-        kwargs.pop("custom_field", None)
-        parent_id_list = kwargs.get("parent_id_list", [])
+        custom_field = kwargs.pop("custom_field", {})
+        parent_id_list = kwargs.pop("parent_id_list", [])
         print(f"submitted {parent_id_list=}")
-        kwargs.pop("parent_id_list", None)
         submission = Submission(id=id, blob_id=blob_id, state="registered", **kwargs)
         if parent_id_list:
             for parent_id in parent_id_list:
@@ -35,6 +51,7 @@ class SubmissionManager():
         for k, v in custom_field.items():
             sub_cf = SubmissionCustomField(key_name=k, value_type=v.__class__.__name__, value_string=str(v), submission_id=id)
             db.session.add(sub_cf)
+        submission.tenant = tenant
         db.session.add(submission)
         db.session.commit()
         return submission
@@ -69,26 +86,29 @@ class SubmissionManager():
 
     @staticmethod
     def get_root(study):
-        q = Submission.query.filter_by(study=study)
+        t = Tenant.query.filter_by(study=study).first()
+        q = Submission.query.filter_by(tenant=t)
         f = q.order_by(Submission.created_at.desc()).first()
         return f
 
 class CertManager():
     @staticmethod
-    def store_new_entry(issuer, subject):
+    def store_new_entry(issuer, subject, **kwargs):
+        (tenant, kwargs) = get_tenant(**kwargs)
         if issuer is None:
             my_cert = SimpleCert(subject, ca=True)
         else:
-            _cert = CertManager.get_cert(subject=issuer)
-            root = SimpleCert(subject, ca=True, s_crt=_cert.s_crt, s_prv=_cert.s_prv)
+            cert = CertManager.get_cert(subject=issuer)
+            root = SimpleCert(subject, ca=True, s_crt=cert.s_crt, s_prv=cert.s_prv)
             my_cert = SimpleCert(subject)
             my_cert.set_issuer_simple_cert(root)
         my_cert.create_cert()
         my_cert.serialize()
-        _cert = Certificate(issuer=issuer, subject=subject, s_crt=my_cert.s_crt, s_prv=my_cert.s_prv)
-        db.session.add(_cert)
+        cert = Certificate(issuer=issuer, subject=subject, s_crt=my_cert.s_crt, s_prv=my_cert.s_prv)
+        cert.tenant = tenant
+        db.session.add(cert)
         db.session.commit()
-        return _cert
+        return cert
 
     @staticmethod
     def get_cert(subject):
@@ -106,7 +126,9 @@ class SystemManager():
 class PlanManager():
     @staticmethod
     def store_new_entry(**kwargs):
+        (tenant, kwargs) = get_tenant(**kwargs)
         plan = Plan(**kwargs)
+        plan.tenant = tenant
         db.session.add(plan)
         db.session.commit()
         return plan
@@ -119,9 +141,10 @@ class PlanManager():
 class VitalSignManager():
     @staticmethod
     def store_new_entry(**kwargs):
-        custom_field = kwargs.get("vital_sign", {})
-        kwargs.pop("vital_sign", None)
+        custom_field = kwargs.pop("vital_sign", {})
+        (tenant, kwargs) = get_tenant(**kwargs)
         vital_sign = VitalSign(**kwargs)
+        vital_sign.tenant = tenant
         db.session.add(vital_sign)
         db.session.commit()
         for k, v in custom_field.items():
