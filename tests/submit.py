@@ -44,7 +44,7 @@ for i in range(30):
     custom_field = dict()
     for j in random.sample(random_keys, random.randint(0, 4)):
         custom_field[j] = random_values[random.randint(0, 3)]
-    payload = dict(parent_id_list=random.sample(all_id, samples), custom_field=custom_field, creator=["foo", "bar"][random.randint(0, 1)])
+    payload = dict(parent_id_list=random.sample(all_id, samples), custom_field=custom_field, subject=["foo", "bar"][random.randint(0, 1)])
     response = submit_meta(api_end_point, payload=payload)
     my_submission = response.get("submission")
     my_submission_id = my_submission.get("id")

@@ -21,6 +21,8 @@ parents_table = db.Table(
     db.Column("child_id", db.String(40), db.ForeignKey("submission.id")),
 )
 
+key_fields = ("project", "study", "experiment",)
+
 class Tenant(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project = db.Column(db.String(40))
@@ -46,7 +48,7 @@ class Certificate(TimestampMixin, db.Model):
 class Submission(TimestampMixin, db.Model):
     id = db.Column(db.String(40), primary_key=True)
     description = db.Column(db.String(400))
-    creator = db.Column(db.String(40))
+    subject = db.Column(db.String(40))
     state = db.Column(db.String(10), nullable=False)
     blob_id = db.Column(db.String(40), index=True)
     parents = db.relationship(

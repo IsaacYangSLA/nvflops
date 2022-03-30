@@ -2,7 +2,7 @@ import uuid
 
 from ..utils.cert_utils import SimpleCert
 from . import db
-from .models import Certificate, SubmissionCustomField, Plan, Submission, VitalSign, VitalSignCustomField, Tenant
+from .models import Certificate, SubmissionCustomField, Plan, Submission, VitalSign, VitalSignCustomField, Tenant, key_fields
 
 def get_custom_field(model, id):
     cf_list = model.query.get(id).custom_field_list
@@ -29,16 +29,19 @@ def get_or_create(session, model, **kwargs):
         return instance
 
 def get_tenant(**kwargs):
-    project = kwargs.pop("project","proj1")
-    study = kwargs.pop("study","study1")
-    experiment = kwargs.pop("experiment","exp1")
-    tenant = get_or_create(db.session, Tenant, project=project, study=study, experiment=experiment)
+    try:
+        tenant_dict = {k:kwargs.pop(k) for k in key_fields}
+    except KeyError:
+        return (None, kwargs)
+    tenant = get_or_create(db.session, Tenant, **tenant_dict)
     return (tenant, kwargs)
 
 class SubmissionManager():
     @staticmethod
     def store_new_entry(**kwargs):
         (tenant, kwargs) = get_tenant(**kwargs)
+        if tenant is None:
+            return None
         id = str(uuid.uuid4())
         blob_id = str(uuid.uuid4())
         custom_field = kwargs.pop("custom_field", {})
@@ -85,9 +88,11 @@ class SubmissionManager():
         return child_list
 
     @staticmethod
-    def get_root(study):
-        t = Tenant.query.filter_by(study=study).first()
-        q = Submission.query.filter_by(tenant=t)
+    def get_root(**kwargs):
+        tenant, kwargs = get_tenant(**kwargs)
+        if tenant is None:
+            return None
+        q = Submission.query.filter_by(tenant=tenant)
         f = q.order_by(Submission.created_at.desc()).first()
         return f
 
@@ -95,6 +100,8 @@ class CertManager():
     @staticmethod
     def store_new_entry(issuer, subject, **kwargs):
         (tenant, kwargs) = get_tenant(**kwargs)
+        if tenant is None:
+            return None
         if issuer is None:
             my_cert = SimpleCert(subject, ca=True)
         else:
@@ -127,6 +134,8 @@ class PlanManager():
     @staticmethod
     def store_new_entry(**kwargs):
         (tenant, kwargs) = get_tenant(**kwargs)
+        if tenant is None:
+            return None
         plan = Plan(**kwargs)
         plan.tenant = tenant
         db.session.add(plan)
@@ -143,6 +152,8 @@ class VitalSignManager():
     def store_new_entry(**kwargs):
         custom_field = kwargs.pop("vital_sign", {})
         (tenant, kwargs) = get_tenant(**kwargs)
+        if tenant is None:
+            return None
         vital_sign = VitalSign(**kwargs)
         vital_sign.tenant = tenant
         db.session.add(vital_sign)

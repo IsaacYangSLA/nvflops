@@ -10,12 +10,12 @@ routine = Blueprint("routine", __name__, url_prefix="/api/v1/routine")
 @submission.route("", methods=["GET", "POST"])
 def submit():
     if request.method == "GET":
-        return jsonify({"status": "success", "list": SubmissionManager.get_all()})
+        return jsonify({"status": "success", "submission_list": SubmissionManager.get_all()})
     req = request.json
-    print(f"{req=}")
-    submission = SubmissionManager.store_new_entry(**req)
-    print(f"returned submission {submission=}")
-    return jsonify({"status": "success", "submission": submission})
+    result = SubmissionManager.store_new_entry(**req)
+    if result is None:
+        return jsonify({"status": "error"})
+    return jsonify({"status": "success", "submission": result})
 
 
 @submission.route("/<sub_id>/custom_field")
@@ -39,12 +39,10 @@ def children(sub_id):
 @submission.route("/root")
 def get_root():
     req = request.json
-    study = req.get("study", "")
-    root_submission = SubmissionManager.get_root(study)
-    if root_submission:
-        return jsonify({"status": "success", "submission": root_submission})
-    else:
-        return jsonify({"status": "not found", "submission": None})
+    result = SubmissionManager.get_root(**req)
+    if result is None:
+        return jsonify({"status": "error"})
+    return jsonify({"status": "success", "submission": result})
 
 
 @admin.route("/provision", methods=["POST"])
@@ -52,11 +50,13 @@ def provision():
     req = request.json
     issuer = req.pop("issuer", None)
     subject = req.pop("subject", "")
-    cert = CertManager.store_new_entry(issuer, subject, **req)
+    result = CertManager.store_new_entry(issuer, subject, **req)
+    if result is None:
+        return jsonify({"status": "error"})
     return jsonify(
         {
             "status": "success",
-            "certificate": {"cert": cert.s_crt.decode("utf-8"), "key": cert.s_prv.decode("utf-8")},
+            "certificate": {"cert": result.s_crt.decode("utf-8"), "key": result.s_prv.decode("utf-8")},
         }
     )
 
@@ -70,19 +70,22 @@ def refresh():
 @admin.route("/plan", methods=["POST"])
 def add_plan():
     req = request.json
-    plan = PlanManager.store_new_entry(**req)
-    return jsonify({"status": "success", "plan": plan})
+    result = PlanManager.store_new_entry(**req)
+    if result is None:
+        return jsonify({"status": "error"})
+    return jsonify({"status": "success", "plan": result})
 
 
 @routine.route("/vital_sign", methods=["POST"])
 def vital_sign():
     req = request.json
-    VitalSignManager.store_new_entry(**req)
-    plan = PlanManager.get_last_plan()
-    if plan:
-        return jsonify({"status": "success", "action": plan.action, "study": plan.tenant.study})
-    else:
-        return jsonify({"status": "success"})
+    result = VitalSignManager.store_new_entry(**req)
+    if result is None:
+        return jsonify({"status": "error"})
+    result = PlanManager.get_last_plan()
+    if result is None:
+        return jsonify({"status": "error", "plan": None})
+    return jsonify({"status": "success", "plan": result})
 
 
 @s3.route("", methods=["POST"])
