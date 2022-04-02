@@ -2,7 +2,19 @@ import uuid
 
 from ..utils.cert_utils import SimpleCert
 from . import db
-from .models import Certificate, SubmissionCustomField, Plan, Submission, VitalSign, VitalSignCustomField, Tenant, key_fields
+from .models import (
+    Project,
+    Study,
+    Experiment,
+    Participant,
+    Certificate,
+    SubmissionCustomField,
+    Plan,
+    Submission,
+    VitalSign,
+    VitalSignCustomField,
+)
+
 
 def get_custom_field(model, id):
     cf_list = model.query.get(id).custom_field_list
@@ -18,6 +30,7 @@ def get_custom_field(model, id):
             custom_field[cf.key_name] = cf.value_string
     return custom_field
 
+
 def get_or_create(session, model, **kwargs):
     instance = session.query(model).filter_by(**kwargs).first()
     if instance:
@@ -28,15 +41,17 @@ def get_or_create(session, model, **kwargs):
         session.commit()
         return instance
 
+
 def get_tenant(**kwargs):
     try:
-        tenant_dict = {k:kwargs.pop(k) for k in key_fields}
+        tenant_dict = {k: kwargs.pop(k) for k in key_fields}
     except KeyError:
         return (None, kwargs)
     tenant = get_or_create(db.session, Tenant, **tenant_dict)
     return (tenant, kwargs)
 
-class SubmissionManager():
+
+class SubmissionManager:
     @staticmethod
     def store_new_entry(**kwargs):
         (tenant, kwargs) = get_tenant(**kwargs)
@@ -52,7 +67,9 @@ class SubmissionManager():
             for parent_id in parent_id_list:
                 submission.parents.append(Submission.query.get(parent_id))
         for k, v in custom_field.items():
-            sub_cf = SubmissionCustomField(key_name=k, value_type=v.__class__.__name__, value_string=str(v), submission_id=id)
+            sub_cf = SubmissionCustomField(
+                key_name=k, value_type=v.__class__.__name__, value_string=str(v), submission_id=id
+            )
             db.session.add(sub_cf)
         submission.tenant = tenant
         db.session.add(submission)
@@ -96,7 +113,8 @@ class SubmissionManager():
         f = q.order_by(Submission.created_at.desc()).first()
         return f
 
-class CertManager():
+
+class CertManager:
     @staticmethod
     def store_new_entry(issuer, subject, **kwargs):
         (tenant, kwargs) = get_tenant(**kwargs)
@@ -121,16 +139,17 @@ class CertManager():
     def get_cert(subject):
         _cert = Certificate.query.filter_by(subject=subject).first()
         return _cert
-        
-    
-class SystemManager():
+
+
+class SystemManager:
     @staticmethod
     def init_backend():
         db.drop_all()
         db.create_all()
         return True
 
-class PlanManager():
+
+class PlanManager:
     @staticmethod
     def store_new_entry(**kwargs):
         (tenant, kwargs) = get_tenant(**kwargs)
@@ -141,13 +160,14 @@ class PlanManager():
         db.session.add(plan)
         db.session.commit()
         return plan
-    
+
     @staticmethod
     def get_last_plan():
         plan = Plan.query.order_by(Plan.id.desc()).first()
         return plan
 
-class VitalSignManager():
+
+class VitalSignManager:
     @staticmethod
     def store_new_entry(**kwargs):
         custom_field = kwargs.pop("vital_sign", {})
@@ -159,7 +179,9 @@ class VitalSignManager():
         db.session.add(vital_sign)
         db.session.commit()
         for k, v in custom_field.items():
-            cf = VitalSignCustomField(key_name=k, value_type=v.__class__.__name__, value_string=str(v), vital_sign_id=vital_sign.id)
+            cf = VitalSignCustomField(
+                key_name=k, value_type=v.__class__.__name__, value_string=str(v), vital_sign_id=vital_sign.id
+            )
             db.session.add(cf)
         db.session.commit()
         return vital_sign

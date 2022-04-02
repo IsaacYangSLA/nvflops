@@ -20,66 +20,59 @@ def serialize_cert(cert):
 
 
 class SimpleCert(object):
-    def __init__(self, subject: str, ca=False, s_crt=None, s_prv=None):
-        self.ca = ca
+    def __init__(self, subject: str, s_crt=None, s_prv=None):
         self.s_crt = s_crt
         self.s_prv = s_prv
         self.crt = x509.load_pem_x509_certificate(s_crt, default_backend()) if s_crt else None
         self.prv = (
             serialization.load_pem_private_key(s_prv, password=None, backend=default_backend()) if s_prv else None
         )
+        self.pub = self.prv.public_key() if self.prv else None
         self.subject = subject
         self.issuer_simple_cert = None
 
     def set_issuer_simple_cert(self, issuer_simple_cert):
         self.issuer_simple_cert = issuer_simple_cert
 
-    def create_cert(self):
+    def create_cert(self, type):
         if self.s_crt and self.s_prv:
             return
-        if self.ca:
-            self.prv, pub_key = self._generate_keys()
-            self.issuer = self.subject
-            self.crt = self._generate_cert(self.subject, self.issuer, self.prv, pub_key, ca=True)
+        self.prv, self.pub = self._generate_keys()
+        if type == "root":
+            self.issuer = self
         elif self.issuer_simple_cert is not None:
-            self.prv, pub_key = self._generate_keys()
-            self.issuer = self.issuer_simple_cert.subject
-            self.crt = self._generate_cert(self.subject, self.issuer, self.issuer_simple_cert.prv, pub_key)
+            self.issuer = self.issuer_simple_cert
         else:
             raise RuntimeError("No issuer cert found.")
+        self.crt = self._generate_cert(self.subject, self.issuer, self.issuer.prv, type=type)
 
     def serialize(self, pkcs12=False):
         if self.s_crt is None:
             self.s_crt = serialize_cert(self.crt)
         if self.s_prv is None:
             self.s_prv = serialize_pri_key(self.prv)
-        self.s_pfx = serialization.pkcs12.serialize_key_and_certificates(
-            self.subject.encode("utf-8"),
-            self.prv,
-            self.crt,
-            None,
-            serialization.BestAvailableEncryption(self.subject.encode("utf-8")),
-        )
-
-    def get_pri_key_cert(self, participant):
-        pri_key, pub_key = self._generate_keys()
-        subject = participant.subject
-        cert = self._generate_cert(subject, self.issuer, self.pri_key, pub_key)
-        return pri_key, cert
+        if pkcs12:
+            self.s_pfx = serialization.pkcs12.serialize_key_and_certificates(
+                self.subject.encode("utf-8"),
+                self.prv,
+                self.crt,
+                None,
+                serialization.BestAvailableEncryption(self.subject.encode("utf-8")),
+            )
 
     def _generate_keys(self):
         pri_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
         pub_key = pri_key.public_key()
         return pri_key, pub_key
 
-    def _generate_cert(self, subject, issuer, signing_pri_key, subject_pub_key, valid_days=360, ca=False):
-        x509_subject = self._x509_name(subject)
-        x509_issuer = self._x509_name(issuer)
+    def _generate_cert(self, subject_name, issuer_cert, signing_pri_key, type, valid_days=360):
+        x509_subject = self._x509_name(subject_name)
+        x509_issuer = self._x509_name(issuer_cert.subject)
         builder = (
             x509.CertificateBuilder()
             .subject_name(x509_subject)
             .issuer_name(x509_issuer)
-            .public_key(subject_pub_key)
+            .public_key(self.pub)
             .serial_number(x509.random_serial_number())
             .not_valid_before(datetime.datetime.utcnow())
             .not_valid_after(
@@ -88,20 +81,128 @@ class SimpleCert(object):
                 + datetime.timedelta(days=valid_days)
                 # Sign our certificate with our private key
             )
-            .add_extension(x509.SubjectAlternativeName([x509.DNSName(subject)]), critical=False)
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName(subject_name)]), critical=False)
         )
-        if ca:
+        if type == "root":
             builder = (
                 builder.add_extension(
-                    x509.SubjectKeyIdentifier.from_public_key(subject_pub_key),
+                    x509.SubjectKeyIdentifier.from_public_key(self.pub),
                     critical=False,
                 )
                 .add_extension(
-                    x509.AuthorityKeyIdentifier.from_issuer_public_key(subject_pub_key),
+                    x509.AuthorityKeyIdentifier.from_issuer_public_key(self.pub),
                     critical=False,
                 )
-                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=False)
+                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                .add_extension(
+                    x509.KeyUsage(
+                        digital_signature=True,
+                        content_commitment=False,
+                        key_encipherment=False,
+                        data_encipherment=False,
+                        key_agreement=False,
+                        key_cert_sign=True,
+                        crl_sign=True,
+                        encipher_only=False,
+                        decipher_only=False,
+                    ),
+                    critical=True,
+                )
             )
+        elif type == "subca":
+            ski_ext = issuer_cert.crt.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
+            builder = (
+                builder.add_extension(
+                    x509.SubjectKeyIdentifier.from_public_key(self.pub),
+                    critical=False,
+                )
+                .add_extension(
+                    x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski_ext.value),
+                    critical=False,
+                )
+                .add_extension(x509.BasicConstraints(ca=True, path_length=1), critical=True)
+                .add_extension(
+                    x509.KeyUsage(
+                        digital_signature=True,
+                        content_commitment=False,
+                        key_encipherment=False,
+                        data_encipherment=False,
+                        key_agreement=False,
+                        key_cert_sign=True,
+                        crl_sign=True,
+                        encipher_only=False,
+                        decipher_only=False,
+                    ),
+                    critical=True,
+                )
+            )
+        elif type == "server":
+            ski_ext = issuer_cert.crt.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
+            builder = (
+                builder.add_extension(
+                    x509.SubjectKeyIdentifier.from_public_key(self.pub),
+                    critical=False,
+                )
+                .add_extension(
+                    x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski_ext.value),
+                    critical=False,
+                )
+                .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=False)
+                .add_extension(
+                    x509.KeyUsage(
+                        digital_signature=True,
+                        content_commitment=False,
+                        key_encipherment=True,
+                        data_encipherment=False,
+                        key_agreement=False,
+                        key_cert_sign=False,
+                        crl_sign=False,
+                        encipher_only=False,
+                        decipher_only=False,
+                    ),
+                    critical=True,
+                )
+            )
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.SERVER_AUTH]),
+                critical=False,
+            )
+        elif type == "client":
+            builder = (
+                builder.add_extension(
+                    x509.SubjectKeyIdentifier.from_public_key(self.pub),
+                    critical=False,
+                )
+                .add_extension(
+                    x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+                        issuer_cert.crt.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+                    ),
+                    critical=False,
+                )
+                .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=False)
+                .add_extension(
+                    x509.KeyUsage(
+                        digital_signature=True,
+                        content_commitment=True,
+                        key_encipherment=True,
+                        data_encipherment=False,
+                        key_agreement=False,
+                        key_cert_sign=False,
+                        crl_sign=False,
+                        encipher_only=False,
+                        decipher_only=False,
+                    ),
+                    critical=True,
+                )
+            )
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage(
+                    [x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH, x509.oid.ExtendedKeyUsageOID.EMAIL_PROTECTION]
+                ),
+                critical=False,
+            )
+        else:
+            raise ValueError(f"Unable to handle {type=}")
         return builder.sign(signing_pri_key, hashes.SHA256(), default_backend())
 
     def _x509_name(self, cn_name, org_name=None):

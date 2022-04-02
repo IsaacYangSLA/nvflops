@@ -78,7 +78,9 @@ class TrackerAgent:
             self._session.verify = self._ca_path
             self._session.cert = (self._cert_path, self._prv_key_path)
         self._blob_client = minio.Minio(self._blob_end_point, secure=False)
-        self._base_payload = dict(project=self._project, study=self._study, experiment=self._experiment, subject=self._name)
+        self._base_payload = dict(
+            project=self._project, study=self._study, experiment=self._experiment, subject=self._name
+        )
 
     def start_heartbeat(self, update_callback=None, conditional_cb=False):
         self.conditional_cb = conditional_cb

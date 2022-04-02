@@ -7,6 +7,7 @@ s3 = Blueprint("s3", __name__, url_prefix="/api/v1/s3")
 admin = Blueprint("admin", __name__, url_prefix="/api/v1/admin")
 routine = Blueprint("routine", __name__, url_prefix="/api/v1/routine")
 
+
 @submission.route("", methods=["GET", "POST"])
 def submit():
     if request.method == "GET":

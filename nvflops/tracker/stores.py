@@ -13,9 +13,10 @@ admin = Blueprint("admin", __name__, url_prefix="/api/v1/admin")
 routine = Blueprint("routine", __name__, url_prefix="/api/v1/routine")
 
 
-class SQLStore():
+class SQLStore:
     def __init__(self):
         pass
+
 
 @submission.route("", methods=["GET", "POST"])
 def submit():
