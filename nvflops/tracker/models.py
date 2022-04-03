@@ -64,8 +64,9 @@ class SubmissionCustomField(CustomFieldMixin, db.Model):
 # One project has one sub-ca cert
 class Project(CommonMixin, db.Model):
     cert_id = db.Column(db.Integer, db.ForeignKey("certificate.id"), nullable=False)
+    certificate = db.relationship("Certificate", lazy=True, uselist=False)
     studies = db.relationship("Study", lazy=True, backref="project")
-    participants = db.relationship("Participant", lazy=True, backref="project")
+    participants = db.relationship("Participant", lazy="dynamic", backref=db.backref("project", uselist=False))
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -90,6 +91,7 @@ class Experiment(CommonMixin, db.Model):
 
 class Participant(CommonMixin, db.Model):
     cert_id = db.Column(db.Integer, db.ForeignKey("certificate.id"), nullable=False)
+    certificate = db.relationship("Certificate", lazy=True, uselist=False)
     submissions = db.relationship("Submission", lazy=True, backref="participant")
     vital_signs = db.relationship("VitalSign", lazy=True, backref=db.backref("participant"))
     project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False)
@@ -131,7 +133,9 @@ class VitalSignCustomField(CustomFieldMixin, db.Model):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
-class VitalSign(CommonMixin, db.Model):
+class VitalSign(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     participant_id = db.Column(db.Integer, db.ForeignKey("participant.id"), nullable=False)
     custom_field_list = db.relationship("VitalSignCustomField", lazy=True, backref=db.backref("vital_sign"))
 

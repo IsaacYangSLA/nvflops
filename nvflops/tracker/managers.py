@@ -120,8 +120,11 @@ class SystemManager:
         db.create_all()
         fake_cert = Certificate()
         db.session.add(fake_cert)
-        project = Project(name="prj1", cert_id=fake_cert.id)
+        db.session.commit()
+        project = Project(name="prj1")
+        project.certificate = fake_cert
         db.session.add(project)
+        db.session.commit()
         p1 = Participant(name="p1", project_id=project.id, cert_id=fake_cert.id)
         db.session.add(p1)
         p2 = Participant(name="p2", project_id=project.id, cert_id=fake_cert.id)
@@ -132,16 +135,16 @@ class SystemManager:
 
 class StudyManager:
     @staticmethod
-    def new_entry(project_name, **kwargs):
-        project = Project.query.filter_by(name=project_name).first()
-        participants = kwargs.pop("participants")
-        study = Study(project_id=project.id, **kwargs)
-        for item in participants:
-            p = Participant.query.get(item)
-            study.participants.append(p)
-        db.session.add(study)
+    def new_entry(project, **kwargs):
+        _project = Project.query.filter_by(name=project).first()
+        _participants = kwargs.pop("participants")
+        _study = Study(project_id=_project.id, **kwargs)
+        for item in _participants:
+            _pct = Participant.query.get(item)
+            _study.participants.append(_pct)
+        db.session.add(_study)
         db.session.commit()
-        return study
+        return _study
 
 
 class PlanManager:
@@ -153,22 +156,47 @@ class PlanManager:
         return plan
 
     @staticmethod
-    def get_last_plan():
+    def get_last_plan(project, study):
+        _project = Project.query.filter_by(name=project).first()
+        if not _project:
+            return None
+        _study = Study.query.filter_by(name=study, project_id=_project.id).first()
+        if not _study:
+            return None
         plan = Plan.query.order_by(Plan.id.desc()).first()
         return plan
 
 
+class ExpManager:
+    @staticmethod
+    def store_new_entry(**kwargs):
+        _exp = Experiment(**kwargs)
+        db.session.add(_exp)
+        db.session.commit()
+        return _exp
+
+    @staticmethod
+    def get_current_exp(study):
+        _study = Study.query.filter_by(name=study, project_id=_project.id).first()
+        if not _study:
+            return None
+        _exp = Experiment.query.filter_by(study_id=_study.id).order_by(Experiment.id.asc()).first()
+        return _exp
+
+
 class VitalSignManager:
     @staticmethod
-    def store_new_entry(project, study, experiment, **kwargs):
-        custom_field = kwargs.pop("vital_sign", {})
-        vital_sign = VitalSign(**kwargs)
-        db.session.add(vital_sign)
+    def store_new_entry(project, study, participant, **kwargs):
+        # TODO: need to check if user is in project/study
+        _participant = Participant.query.filter_by(name=participant).first()
+        _custom_field = kwargs.pop("vital_sign", {})
+        _vital_sign = VitalSign(participant_id=_participant.id)
+        db.session.add(_vital_sign)
         db.session.commit()
-        for k, v in custom_field.items():
-            cf = VitalSignCustomField(
-                key_name=k, value_type=v.__class__.__name__, value_string=str(v), vital_sign_id=vital_sign.id
+        for k, v in _custom_field.items():
+            _cf = VitalSignCustomField(
+                key_name=k, value_type=v.__class__.__name__, value_string=str(v), vital_sign_id=_vital_sign.id
             )
-            db.session.add(cf)
-        db.session.commit()
-        return vital_sign
+            db.session.add(_cf)
+            db.session.commit()
+        return _vital_sign

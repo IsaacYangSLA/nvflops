@@ -80,11 +80,11 @@ def add_plan():
 @admin.route("/study", methods=["POST"])
 def add_study():
     headers = request.headers
-    project_name = headers.get("X-Project")
-    if not project_name:
+    project = headers.get("X-Project")
+    if not project:
         return jsonify({"status": "error"})
     req = request.json
-    result = StudyManager.new_entry(project_name=project_name, **req)
+    result = StudyManager.new_entry(project=project, **req)
     if result is None:
         return jsonify({"status": "error"})
     return jsonify({"status": "success", "study": result})
@@ -92,11 +92,21 @@ def add_study():
 
 @routine.route("/vital_sign", methods=["POST"])
 def vital_sign():
+    headers = request.headers
+    project = headers.get("X-Project")
+    if not project:
+        return jsonify({"status": "error"})
+    study = headers.get("X-Study")
+    if not study:
+        return jsonify({"status": "error"})
+    pct = headers.get("X-Pct")
+    if not pct:
+        return jsonify({"status": "error"})
     req = request.json
-    result = VitalSignManager.store_new_entry(**req)
+    result = VitalSignManager.store_new_entry(project=project, study=study, participant=pct, **req)
     if result is None:
         return jsonify({"status": "error"})
-    result = PlanManager.get_last_plan()
+    result = PlanManager.get_last_plan(project=project, study=study)
     if result is None:
         return jsonify({"status": "error", "plan": None})
     return jsonify({"status": "success", "plan": result})

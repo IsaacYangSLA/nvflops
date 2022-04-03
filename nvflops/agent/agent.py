@@ -137,7 +137,7 @@ class TrackerAgent(BaseAgent):
             self._session.verify = self._ca_path
             self._session.cert = (self._cert_path, self._prv_key_path)
         self._blob_client = minio.Minio(self._blob_end_point, secure=False)
-        self._base_headers = {"X-Project": self._project, "X-Study": self._study, "X-User": self._name}
+        self._base_headers = {"X-Project": self._project, "X-Study": self._study, "X-Pct": self._name}
         self._base_payload = {"experiment": self._experiment}
 
     def start_reporting_vital_signs(self, update_callback=None, conditional_cb=False):
