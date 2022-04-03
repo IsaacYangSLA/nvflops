@@ -31,32 +31,9 @@ def get_custom_field(model, id):
     return custom_field
 
 
-def get_or_create(session, model, **kwargs):
-    instance = session.query(model).filter_by(**kwargs).first()
-    if instance:
-        return instance
-    else:
-        instance = model(**kwargs)
-        session.add(instance)
-        session.commit()
-        return instance
-
-
-def get_tenant(**kwargs):
-    try:
-        tenant_dict = {k: kwargs.pop(k) for k in key_fields}
-    except KeyError:
-        return (None, kwargs)
-    tenant = get_or_create(db.session, Tenant, **tenant_dict)
-    return (tenant, kwargs)
-
-
 class SubmissionManager:
     @staticmethod
     def store_new_entry(**kwargs):
-        (tenant, kwargs) = get_tenant(**kwargs)
-        if tenant is None:
-            return None
         id = str(uuid.uuid4())
         blob_id = str(uuid.uuid4())
         custom_field = kwargs.pop("custom_field", {})
@@ -71,7 +48,6 @@ class SubmissionManager:
                 key_name=k, value_type=v.__class__.__name__, value_string=str(v), submission_id=id
             )
             db.session.add(sub_cf)
-        submission.tenant = tenant
         db.session.add(submission)
         db.session.commit()
         return submission
@@ -106,7 +82,7 @@ class SubmissionManager:
 
     @staticmethod
     def get_root(**kwargs):
-        tenant, kwargs = get_tenant(**kwargs)
+        tenant = "123"
         if tenant is None:
             return None
         q = Submission.query.filter_by(tenant=tenant)
@@ -117,9 +93,6 @@ class SubmissionManager:
 class CertManager:
     @staticmethod
     def store_new_entry(issuer, subject, **kwargs):
-        (tenant, kwargs) = get_tenant(**kwargs)
-        if tenant is None:
-            return None
         if issuer is None:
             my_cert = SimpleCert(subject, ca=True)
         else:
@@ -130,7 +103,6 @@ class CertManager:
         my_cert.create_cert()
         my_cert.serialize()
         cert = Certificate(issuer=issuer, subject=subject, s_crt=my_cert.s_crt, s_prv=my_cert.s_prv)
-        cert.tenant = tenant
         db.session.add(cert)
         db.session.commit()
         return cert
@@ -146,17 +118,36 @@ class SystemManager:
     def init_backend():
         db.drop_all()
         db.create_all()
+        fake_cert = Certificate()
+        db.session.add(fake_cert)
+        project = Project(name="prj1", cert_id=fake_cert.id)
+        db.session.add(project)
+        p1 = Participant(name="p1", project_id=project.id, cert_id=fake_cert.id)
+        db.session.add(p1)
+        p2 = Participant(name="p2", project_id=project.id, cert_id=fake_cert.id)
+        db.session.add(p2)
+        db.session.commit()
         return True
+
+
+class StudyManager:
+    @staticmethod
+    def new_entry(project_name, **kwargs):
+        project = Project.query.filter_by(name=project_name).first()
+        participants = kwargs.pop("participants")
+        study = Study(project_id=project.id, **kwargs)
+        for item in participants:
+            p = Participant.query.get(item)
+            study.participants.append(p)
+        db.session.add(study)
+        db.session.commit()
+        return study
 
 
 class PlanManager:
     @staticmethod
     def store_new_entry(**kwargs):
-        (tenant, kwargs) = get_tenant(**kwargs)
-        if tenant is None:
-            return None
         plan = Plan(**kwargs)
-        plan.tenant = tenant
         db.session.add(plan)
         db.session.commit()
         return plan
@@ -169,13 +160,9 @@ class PlanManager:
 
 class VitalSignManager:
     @staticmethod
-    def store_new_entry(**kwargs):
+    def store_new_entry(project, study, experiment, **kwargs):
         custom_field = kwargs.pop("vital_sign", {})
-        (tenant, kwargs) = get_tenant(**kwargs)
-        if tenant is None:
-            return None
         vital_sign = VitalSign(**kwargs)
-        vital_sign.tenant = tenant
         db.session.add(vital_sign)
         db.session.commit()
         for k, v in custom_field.items():

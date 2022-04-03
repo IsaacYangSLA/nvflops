@@ -45,6 +45,7 @@ class SimpleCert(object):
         else:
             raise RuntimeError("No issuer cert found.")
         self.crt = self._generate_cert(self.subject, self.issuer, self.issuer.prv, type=type)
+        self.sha1_fingerprint_str = self.crt.fingerprint(hashes.SHA1()).hex()
 
     def serialize(self, pkcs12=False):
         if self.s_crt is None:

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from .managers import SubmissionManager, CertManager, SystemManager, VitalSignManager, PlanManager
+from .managers import SubmissionManager, CertManager, SystemManager, VitalSignManager, PlanManager, StudyManager
 
 submission = Blueprint("submission", __name__, url_prefix="/api/v1/submission")
 s3 = Blueprint("s3", __name__, url_prefix="/api/v1/s3")
@@ -75,6 +75,19 @@ def add_plan():
     if result is None:
         return jsonify({"status": "error"})
     return jsonify({"status": "success", "plan": result})
+
+
+@admin.route("/study", methods=["POST"])
+def add_study():
+    headers = request.headers
+    project_name = headers.get("X-Project")
+    if not project_name:
+        return jsonify({"status": "error"})
+    req = request.json
+    result = StudyManager.new_entry(project_name=project_name, **req)
+    if result is None:
+        return jsonify({"status": "error"})
+    return jsonify({"status": "success", "study": result})
 
 
 @routine.route("/vital_sign", methods=["POST"])

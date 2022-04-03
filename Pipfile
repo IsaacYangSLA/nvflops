@@ -5,17 +5,16 @@ name = "pypi"
 
 [packages]
 flask = "*"
-boto3 = "*"
 flask-sqlalchemy = "*"
-minio = "*"
+black = "*"
+cryptography = "*"
 requests = "*"
-flask-migrate = "*"
+minio = "*"
+boto3 = "*"
 nvflops = {editable = true, path = "."}
 psutil = "*"
 
 [dev-packages]
-pipenv-setup = {extras = ["block"], version = "*"}
-nvflops = {editable = true, path = "."}
 
 [requires]
 python_version = "3.8"
