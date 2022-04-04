@@ -203,7 +203,7 @@ class ExpManager:
 
     @staticmethod
     def get_current_exp(study):
-        _study = Study.query.filter_by(name=study, project_id=_project.id).first()
+        _study = Study.query.filter_by(name=study).first()
         if not _study:
             return None
         _exp = Experiment.query.filter_by(study_id=_study.id).order_by(Experiment.id.asc()).first()
