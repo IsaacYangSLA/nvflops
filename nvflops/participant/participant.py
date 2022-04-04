@@ -13,7 +13,7 @@ import minio
 from requests import Request, RequestException, Session, codes
 from requests.adapters import HTTPAdapter
 
-from nvflops.agent.agent import TrackerAgent
+from nvflops.participant.agent import TrackerAgent
 
 
 def setup_basic_info():
