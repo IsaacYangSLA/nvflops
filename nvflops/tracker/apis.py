@@ -1,6 +1,14 @@
 from flask import Blueprint, jsonify, request
 
-from .managers import SubmissionManager, CertManager, SystemManager, VitalSignManager, PlanManager, StudyManager
+from .managers import (
+    CertManager,
+    PlanManager,
+    SeedManager,
+    StudyManager,
+    SubmissionManager,
+    SystemManager,
+    VitalSignManager,
+)
 
 submission = Blueprint("submission", __name__, url_prefix="/api/v1/submission")
 s3 = Blueprint("s3", __name__, url_prefix="/api/v1/s3")
@@ -75,6 +83,18 @@ def add_plan():
     if result is None:
         return jsonify({"status": "error"})
     return jsonify({"status": "success", "plan": result})
+
+
+@admin.route("/seed", methods=["POST"])
+def seed():
+    req = request.json
+    project = req.get("project")
+    study = req.get("study")
+    participants = req.get("participants")
+    result = SeedManager.store_new_entry(project=project, study=study, participants=participants)
+    if result is None:
+        return jsonify({"status": "error"})
+    return jsonify({"status": "success", "project": result})
 
 
 @admin.route("/study", methods=["POST"])

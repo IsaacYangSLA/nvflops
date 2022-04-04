@@ -1,9 +1,10 @@
 import io
 import logging
-from threading import Thread, Lock, Event
 import time
-from typing import Any, Dict, Optional
 from pprint import pprint
+from threading import Event, Lock, Thread
+from typing import Any, Dict, Optional
+
 import minio
 import psutil
 from requests import Request, RequestException, Session, codes

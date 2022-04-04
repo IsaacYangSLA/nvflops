@@ -1,1 +1,11 @@
 name: build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Dummy.  Do nothing
+      run: |
+        /usr/bin/env

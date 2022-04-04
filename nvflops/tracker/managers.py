@@ -3,14 +3,14 @@ import uuid
 from ..utils.cert_utils import SimpleCert
 from . import db
 from .models import (
-    Project,
-    Study,
+    Certificate,
     Experiment,
     Participant,
-    Certificate,
-    SubmissionCustomField,
     Plan,
+    Project,
+    Study,
     Submission,
+    SubmissionCustomField,
     VitalSign,
     VitalSignCustomField,
 )
@@ -118,18 +118,6 @@ class SystemManager:
     def init_backend():
         db.drop_all()
         db.create_all()
-        fake_cert = Certificate()
-        db.session.add(fake_cert)
-        db.session.commit()
-        project = Project(name="prj1")
-        project.certificate = fake_cert
-        db.session.add(project)
-        db.session.commit()
-        p1 = Participant(name="p1", project_id=project.id, cert_id=fake_cert.id)
-        db.session.add(p1)
-        p2 = Participant(name="p2", project_id=project.id, cert_id=fake_cert.id)
-        db.session.add(p2)
-        db.session.commit()
         return True
 
 
@@ -154,6 +142,44 @@ class PlanManager:
         db.session.add(plan)
         db.session.commit()
         return plan
+
+    @staticmethod
+    def get_last_plan(project, study):
+        _project = Project.query.filter_by(name=project).first()
+        if not _project:
+            return None
+        _study = Study.query.filter_by(name=study, project_id=_project.id).first()
+        if not _study:
+            return None
+        plan = Plan.query.order_by(Plan.id.desc()).first()
+        return plan
+
+
+class SeedManager:
+    @staticmethod
+    def store_new_entry(project, study, participants):
+        fake_cert = Certificate()
+        db.session.add(fake_cert)
+        db.session.commit()
+
+        _project = Project(name=project)
+        _project.certificate = fake_cert
+        db.session.add(_project)
+        db.session.commit()
+
+        _study = Study(name=study, project_id=_project.id)
+        _study.certificate = fake_cert
+        db.session.add(_study)
+        db.session.commit()
+        _project.studies.append(_study)
+        for pct in participants:
+            p = Participant(name=pct, project_id=_project.id, cert_id=fake_cert.id)
+            db.session.add(p)
+            db.session.commit()
+            _study.participants.append(p)
+        db.session.add(_study)
+        db.session.commit()
+        return _project
 
     @staticmethod
     def get_last_plan(project, study):
