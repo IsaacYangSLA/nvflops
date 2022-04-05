@@ -2,6 +2,14 @@ from datetime import datetime
 
 from . import db
 
+# from sqlalchemy_mixins import AllFeaturesMixin
+
+######### Models #########
+# class BaseModel(db.Model, AllFeaturesMixin):
+#     __abstract__ = True
+#     pass
+
+
 parents_table = db.Table(
     "parents_table",
     db.Column("parent_id", db.String(40), db.ForeignKey("submission.id")),
