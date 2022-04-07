@@ -65,7 +65,8 @@ query, but good for monitoring/dashboard.
 
 class Submission(db.Model):
     id = db.Column(db.String(40), primary_key=True)
-    part_id = db.Column(db.Integer, db.ForeignKey("participant.id"), nullable=False)
+    pct_id = db.Column(db.Integer, db.ForeignKey("participant.id"), nullable=False)
+    exp_id = db.Column(db.Integer, db.ForeignKey("experiment.id"), nullable=False)
     state = db.Column(db.String(10), nullable=False)
     blob_id = db.Column(db.String(40), index=True)
     parents = db.relationship(
@@ -77,7 +78,6 @@ class Submission(db.Model):
         backref=db.backref("children"),
     )
     custom_field_list = db.relationship("SubmissionCustomField", lazy=True, backref=db.backref("submission"))
-    exp_id = db.Column(db.Integer, db.ForeignKey("experiment.id"), nullable=False)
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -126,14 +126,15 @@ class Experiment(CommonMixin, db.Model):
     plans = db.relationship("Plan", lazy=True, backref=db.backref("experiment"))
     blob_id = db.Column(db.String(40))
     participant_roles = db.relationship("ParticipantRole", lazy=True, backref=db.backref("experiment"))
+    submissions = db.relationship("Submission", lazy=True, backref=db.backref("experiment", uselist=False))
 
 
 class Participant(CommonMixin, db.Model):
     cert_id = db.Column(db.Integer, db.ForeignKey("certificate.id"), nullable=False)
     certificate = db.relationship("Certificate", lazy=True, uselist=False)
-    submissions = db.relationship("Submission", lazy=True, backref="participant")
-    vital_signs = db.relationship("VitalSign", lazy=True, backref=db.backref("participant"))
+    vital_signs = db.relationship("VitalSign", lazy=True, backref=db.backref("participant", uselist=False))
     project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False)
+    submissions = db.relationship("Submission", lazy=True, backref=db.backref("participant", uselist=False))
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

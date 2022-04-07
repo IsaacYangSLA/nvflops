@@ -34,15 +34,26 @@ def get_custom_field(model, id):
 class SubmissionManager:
     @staticmethod
     def store_new_entry(exp, *key_tuple, **kwargs):
-        _exp = Experiment.query.filter(
-            Experiment.name == exp, Experiment.project.name == key_tuple[0], Experiment.study.name == key_tuple[1]
-        ).first()
+        _exp = (
+            Experiment.query.join(Study)
+            .join(Project)
+            .filter(Project.name == key_tuple[0])
+            .filter(Study.name == key_tuple[1])
+            .filter(Experiment.name == exp)
+            .first()
+        )
+        _pct = (
+            Participant.query.join(Project)
+            .filter(Project.name == key_tuple[0])
+            .filter(Participant.name == key_tuple[2])
+            .first()
+        )
         id = str(uuid.uuid4())
         blob_id = str(uuid.uuid4())
         custom_field = kwargs.pop("custom_field", {})
         parent_id_list = kwargs.pop("parent_id_list", [])
         print(f"submitted {parent_id_list=}")
-        submission = Submission(blob_id=blob_id, state="registered", **kwargs)
+        submission = Submission(id=id, blob_id=blob_id, state="registered", pct_id=_pct.id, exp_id=_exp.id)
         if parent_id_list:
             for parent_id in parent_id_list:
                 submission.parents.append(Submission.query.get(parent_id))
