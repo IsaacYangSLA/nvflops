@@ -16,12 +16,28 @@ admin = Blueprint("admin", __name__, url_prefix="/api/v1/admin")
 routine = Blueprint("routine", __name__, url_prefix="/api/v1/routine")
 
 
+def get_mandatory_headers(headers):
+    project = headers.get("X-Project")
+    if not project:
+        return None
+    study = headers.get("X-Study")
+    if not study:
+        return None
+    pct = headers.get("X-Pct")
+    if not pct:
+        return None
+    return (project, study, pct)
+
+
 @submission.route("", methods=["GET", "POST"])
 def submit():
+    key_tuple = get_mandatory_headers(request.header)
+    if not key_tuple:
+        return jsonify({"status": "error"})
     if request.method == "GET":
-        return jsonify({"status": "success", "submission_list": SubmissionManager.get_all()})
+        return jsonify({"status": "success", "submission_list": SubmissionManager.get_all(*key_tuple)})
     req = request.json
-    result = SubmissionManager.store_new_entry(**req)
+    result = SubmissionManager.store_new_entry(*key_tuple, **req)
     if result is None:
         return jsonify({"status": "error"})
     return jsonify({"status": "success", "submission": result})

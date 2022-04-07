@@ -1,6 +1,28 @@
 from datetime import datetime
+import uuid
+from flask_sqlalchemy import SQLAlchemy
+from flask import Flask
 
-from . import db
+app = Flask(__name__)
+db = SQLAlchemy()
+db.init_app(app)
+app.app_context().push()
+
+
+def get_custom_field(model, id):
+    cf_list = model.query.get(id).custom_field_list
+    custom_field = dict()
+    for cf in cf_list:
+        if cf.value_type == "bool":
+            custom_field[cf.key_name] = True if cf.value_string == "True" else False
+        elif cf.value_type == "int":
+            custom_field[cf.key_name] = int(cf.value_string)
+        elif cf.value_type == "float":
+            custom_field[cf.key_name] = float(cf.value_string)
+        else:
+            custom_field[cf.key_name] = cf.value_string
+    return custom_field
+
 
 # from sqlalchemy_mixins import AllFeaturesMixin
 
@@ -92,8 +114,6 @@ class SubmissionCustomField(CustomFieldMixin, db.Model):
 
 # One project has one sub-ca cert
 class Project(CommonMixin, db.Model):
-    cert_id = db.Column(db.Integer, db.ForeignKey("certificate.id"), nullable=False)
-    certificate = db.relationship("Certificate", lazy=True, uselist=False)
     studies = db.relationship("Study", lazy=True, backref="project")
     participants = db.relationship("Participant", lazy="dynamic", backref=db.backref("project", uselist=False))
 
@@ -106,7 +126,6 @@ class Study(CommonMixin, db.Model):
     participants = db.relationship(
         "Participant", secondary=study_participant_table, lazy="subquery", backref=db.backref("studies", lazy=False)
     )
-    blob_id = db.Column(db.String(40))
     experiments = db.relationship("Experiment", lazy=True, backref=db.backref("study", uselist=False))
 
     def asdict(self):
@@ -129,26 +148,8 @@ class Experiment(CommonMixin, db.Model):
 
 
 class Participant(CommonMixin, db.Model):
-    cert_id = db.Column(db.Integer, db.ForeignKey("certificate.id"), nullable=False)
-    certificate = db.relationship("Certificate", lazy=True, uselist=False)
     submissions = db.relationship("Submission", lazy=True, backref="participant")
-    vital_signs = db.relationship("VitalSign", lazy=True, backref=db.backref("participant"))
     project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False)
-
-    def asdict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
-
-# Root CA does not change and must be pre-provisioned.
-# Tracker cert has to be pre-provisioned before running.
-# TODO: tools to generate such information to be inserted to DB.
-class Certificate(CommonMixin, db.Model):
-    fingerprint = db.Column(db.String(40), index=True)
-    issuer = db.Column(db.String(25))
-    subject = db.Column(db.String(25))
-    s_crt = db.Column(db.String(2000))
-    s_prv = db.Column(db.String(2000))
-    role = db.Column(db.String(10))
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -165,18 +166,79 @@ class Plan(CommonMixin, db.Model):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
-class VitalSignCustomField(CustomFieldMixin, db.Model):
-    vital_sign_id = db.Column(db.Integer, db.ForeignKey("vital_sign.id"), nullable=False)
+class SubmissionManager:
+    @staticmethod
+    def store_new_entry(exp, *key_tuple, **kwargs):
+        _exp = Experiment.query.filter(
+            Experiment.name == exp, Experiment.project.name == key_tuple[0], Experiment.study.name == key_tuple[1]
+        ).first()
+        id = str(uuid.uuid4())
+        blob_id = str(uuid.uuid4())
+        custom_field = kwargs.pop("custom_field", {})
+        parent_id_list = kwargs.pop("parent_id_list", [])
+        print(f"submitted {parent_id_list=}")
+        submission = Submission(blob_id=blob_id, state="registered", **kwargs)
+        if parent_id_list:
+            for parent_id in parent_id_list:
+                submission.parents.append(Submission.query.get(parent_id))
+        for k, v in custom_field.items():
+            sub_cf = SubmissionCustomField(
+                key_name=k, value_type=v.__class__.__name__, value_string=str(v), submission_id=id
+            )
+            db.session.add(sub_cf)
+        db.session.add(submission)
+        db.session.commit()
+        return submission
 
-    def asdict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+    @staticmethod
+    def update_state(blob_id, state):
+        submission = Submission.query.filter_by(blob_id=blob_id).limit(1).first()
+        submission.state = state
+        db.session.add(submission)
+        db.session.commit()
+        return submission
+
+    @staticmethod
+    def get_custom_field(sub_id):
+        custom_field = get_custom_field(Submission, sub_id)
+        return custom_field
+
+    @staticmethod
+    def get_all(exp, *key_tuple):
+        _exp = Experiment.query.filter_by(name=exp, project=key_tuple[0], study=key_tuple[1]).first()
+        _all = Submission.query.filter_by(experiment=_exp).all()
+        return _all
+
+    @staticmethod
+    def get_parents(sub_id):
+        parent_list = Submission.query.get(sub_id).parents
+        return parent_list
+
+    @staticmethod
+    def get_children(sub_id):
+        child_list = Submission.query.get(sub_id).children
+        return child_list
+
+    @staticmethod
+    def get_root(**kwargs):
+        tenant = "123"
+        if tenant is None:
+            return None
+        q = Submission.query.filter_by(tenant=tenant)
+        f = q.order_by(Submission.created_at.desc()).first()
+        return f
 
 
-class VitalSign(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    participant_id = db.Column(db.Integer, db.ForeignKey("participant.id"), nullable=False)
-    custom_field_list = db.relationship("VitalSignCustomField", lazy=True, backref=db.backref("vital_sign"))
+db.drop_all()
+db.create_all()
+key_tuple = ("proj1", "study1", "site1")
 
-    def asdict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+p1 = Project(name="proj1")
+# db.session.add(p1)
+# db.session.flush()
+s1 = Study(name="study1")
+p1.studies.append(s1)
+db.session.add(p1)
+db.session.commit()
+print(p1)
+print(s1)
