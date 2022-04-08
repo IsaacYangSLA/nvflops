@@ -19,10 +19,10 @@ from nvflops.tracker.models import (
 )
 
 from nvflops.tracker.managers import (
-    CertManager,
-    PlanManager,
-    SeedManager,
-    StudyManager,
+    CertAdm,
+    PlanAdm,
+    StudyAdm,
+    ExpAdm,
     SubmissionManager,
     SystemManager,
     VitalSignManager,
@@ -44,10 +44,6 @@ def init():
     db.session.add(s1)
     db.session.flush()
 
-    e1 = Experiment(name="exp1", study_id=s1.id)
-    db.session.add(e1)
-    db.session.flush()
-
     pct1 = Participant(name="site1", cert_id=fake_cert.id)
     pct1.project_id = p1.id
     pct1.study_id = s1.id
@@ -62,7 +58,15 @@ def init():
 
 
 init()
+e1 = ExpAdm.insert_entry("exp1", "study1", "proj1", **{"participants": {"site1": "aggregator"}})
+db.session.add(e1)
+db.session.flush()
 key_tuple = ("proj1", "study1", "site1")
-sub1 = SubmissionManager.store_new_entry("exp1", *key_tuple)
-sub2 = SubmissionManager.store_new_entry("exp1", *key_tuple, parent_id_list=[sub1.id])
-print(sub2.asdict())
+sub = SubmissionManager.insert_entry("exp1", *key_tuple)
+print(sub.id)
+sub = SubmissionManager.insert_entry("exp1", *key_tuple, parent_id_list=[sub.id])
+root_sub = SubmissionManager.get_root("exp1", *key_tuple)
+print(root_sub)
+
+plan = PlanAdm.insert_entry("plan1", "exp1", "study1", "proj1", **{"effective_time": "2022-04-08"})
+print(plan)

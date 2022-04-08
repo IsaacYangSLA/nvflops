@@ -1,10 +1,9 @@
 from flask import Blueprint, jsonify, request
 
 from .managers import (
-    CertManager,
-    PlanManager,
-    SeedManager,
-    StudyManager,
+    CertAdm,
+    PlanAdm,
+    StudyAdm,
     SubmissionManager,
     SystemManager,
     VitalSignManager,

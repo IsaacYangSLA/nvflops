@@ -1,11 +1,12 @@
 import uuid
-
+from datetime import datetime
 from ..utils.cert_utils import SimpleCert
 from . import db
 from .models import (
     Certificate,
     Experiment,
     Participant,
+    ParticipantRole,
     Plan,
     Project,
     Study,
@@ -31,28 +32,41 @@ def get_custom_field(model, id):
     return custom_field
 
 
+def get_exp_by_key_tuple(exp_name, *key_tuple):
+    _exp = (
+        Experiment.query.join(Study)
+        .join(Project)
+        .filter(Project.name == key_tuple[0])
+        .filter(Study.name == key_tuple[1])
+        .filter(Experiment.name == exp_name)
+        .first()
+    )
+    return _exp
+
+
+def get_pct_by_key_tuple(*key_tuple):
+    _pct = (
+        Participant.query.join(Project)
+        .filter(Project.name == key_tuple[0])
+        .filter(Participant.name == key_tuple[2])
+        .first()
+    )
+    return _pct
+
+
 class SubmissionManager:
     @staticmethod
-    def store_new_entry(exp, *key_tuple, **kwargs):
-        _exp = (
-            Experiment.query.join(Study)
-            .join(Project)
-            .filter(Project.name == key_tuple[0])
-            .filter(Study.name == key_tuple[1])
-            .filter(Experiment.name == exp)
-            .first()
-        )
-        _pct = (
-            Participant.query.join(Project)
-            .filter(Project.name == key_tuple[0])
-            .filter(Participant.name == key_tuple[2])
-            .first()
-        )
+    def insert_entry(exp_name, *key_tuple, **kwargs):
+        _exp = get_exp_by_key_tuple(exp_name, *key_tuple)
+        if not _exp:
+            return None
+        _pct = get_pct_by_key_tuple(*key_tuple)
+        if not _pct:
+            return None
         id = str(uuid.uuid4())
         blob_id = str(uuid.uuid4())
         custom_field = kwargs.pop("custom_field", {})
         parent_id_list = kwargs.pop("parent_id_list", [])
-        print(f"submitted {parent_id_list=}")
         submission = Submission(id=id, blob_id=blob_id, state="registered", pct_id=_pct.id, exp_id=_exp.id)
         if parent_id_list:
             for parent_id in parent_id_list:
@@ -68,16 +82,18 @@ class SubmissionManager:
 
     @staticmethod
     def update_state(blob_id, state):
-        submission = Submission.query.filter_by(blob_id=blob_id).limit(1).first()
-        submission.state = state
-        db.session.add(submission)
+        _sub = Submission.query.filter_by(blob_id=blob_id).first()
+        if not _sub:
+            return None
+        _sub.state = state
+        db.session.add(_sub)
         db.session.commit()
-        return submission
+        return _sub
 
     @staticmethod
     def get_custom_field(sub_id):
-        custom_field = get_custom_field(Submission, sub_id)
-        return custom_field
+        _custom_field = get_custom_field(Submission, sub_id)
+        return _custom_field
 
     @staticmethod
     def get_all(exp, *key_tuple):
@@ -87,25 +103,24 @@ class SubmissionManager:
 
     @staticmethod
     def get_parents(sub_id):
-        parent_list = Submission.query.get(sub_id).parents
-        return parent_list
+        _parent_list = Submission.query.get(sub_id).parents
+        return _parent_list
 
     @staticmethod
     def get_children(sub_id):
-        child_list = Submission.query.get(sub_id).children
-        return child_list
+        _child_list = Submission.query.get(sub_id).children
+        return _child_list
 
     @staticmethod
-    def get_root(**kwargs):
-        tenant = "123"
-        if tenant is None:
+    def get_root(exp_name, *key_tuple):
+        _exp = get_exp_by_key_tuple(exp_name, *key_tuple)
+        if not _exp:
             return None
-        q = Submission.query.filter_by(tenant=tenant)
-        f = q.order_by(Submission.created_at.desc()).first()
-        return f
+        _root_sub = Submission.query.filter_by(exp_id=_exp.id).order_by(Submission.created_at).first()
+        return _root_sub
 
 
-class CertManager:
+class CertAdm:
     @staticmethod
     def store_new_entry(issuer, subject, **kwargs):
         if issuer is None:
@@ -136,82 +151,65 @@ class SystemManager:
         return True
 
 
-class StudyManager:
+class StudyAdm:
     @staticmethod
-    def new_entry(project, **kwargs):
-        _project = Project.query.filter_by(name=project).first()
-        _participants = kwargs.pop("participants")
-        _study = Study(project_id=_project.id, **kwargs)
-        for item in _participants:
-            _pct = Participant.query.get(item)
+    def insert_entry(study_name, *key_tuple, **kwargs):
+        _prj = Project.query.filter_by(name=key_tuple[0]).first()
+        if not _prj:
+            return None
+        _pct_name_list = kwargs.pop("participants")
+        if not _pct_name_list:
+            return None
+        _study = Study(name=study_name, project_id=_prj.id)
+        for name in _pct_name_list:
+            _pct = Participant.query.filter_by(name=name).first()
+            if not _pct:
+                return None
             _study.participants.append(_pct)
         db.session.add(_study)
         db.session.commit()
         return _study
 
 
-class PlanManager:
+class PlanAdm:
     @staticmethod
-    def store_new_entry(**kwargs):
-        plan = Plan(**kwargs)
+    def insert_entry(plan_name, exp_name, study_name, project_name, **kwargs):
+        adm_tuple = (project_name, study_name, "")
+        _exp = get_exp_by_key_tuple(exp_name, *adm_tuple)
+        _eff_time = datetime.fromisoformat(kwargs.get("effective_time"))
+        plan = Plan(name=plan_name, effective_time=_eff_time, exp_id=_exp.id)
         db.session.add(plan)
         db.session.commit()
         return plan
 
     @staticmethod
-    def get_last_plan(project, study):
-        _project = Project.query.filter_by(name=project).first()
-        if not _project:
+    def get_last_plan(exp_name, study_name, project_name):
+        _exp = get_exp_by_key_tuple(exp_name, *(project_name, study_name, ""))
+        if not _exp:
             return None
-        _study = Study.query.filter_by(name=study, project_id=_project.id).first()
-        if not _study:
-            return None
-        plan = Plan.query.order_by(Plan.id.desc()).first()
+        plan = Plan.query.filter_by(exp_id=_exp.id).order_by(Plan.id.desc()).first()
         return plan
 
 
-class SeedManager:
+class ExpAdm:
     @staticmethod
-    def store_new_entry(project, study, participants):
-        fake_cert = Certificate()
-        db.session.add(fake_cert)
-        db.session.commit()
-
-        _project = Project(name=project)
-        _project.certificate = fake_cert
-        db.session.add(_project)
-        db.session.commit()
-
-        _study = Study(name=study, project_id=_project.id)
-        _study.certificate = fake_cert
-        db.session.add(_study)
-        db.session.commit()
-        _project.studies.append(_study)
-        for pct in participants:
-            p = Participant(name=pct, project_id=_project.id, cert_id=fake_cert.id)
-            db.session.add(p)
-            db.session.commit()
-            _study.participants.append(p)
-        db.session.add(_study)
-        db.session.commit()
-        return _project
-
-    @staticmethod
-    def get_last_plan(project, study):
-        _project = Project.query.filter_by(name=project).first()
-        if not _project:
+    def insert_entry(exp_name, study_name, project_name, **kwargs):
+        _study = Study.query.filter_by(name=study_name).join(Project).filter(Project.name == project_name).first()
+        blob_id = str(uuid.uuid4())
+        _exp = Experiment(name=exp_name, study_id=_study.id, blob_id=blob_id)
+        db.session.add(_exp)
+        db.session.flush()
+        pct_name_role_dict = kwargs.get("participants")
+        if not pct_name_role_dict:
             return None
-        _study = Study.query.filter_by(name=study, project_id=_project.id).first()
-        if not _study:
-            return None
-        plan = Plan.query.order_by(Plan.id.desc()).first()
-        return plan
-
-
-class ExpManager:
-    @staticmethod
-    def store_new_entry(**kwargs):
-        _exp = Experiment(**kwargs)
+        for k, v in pct_name_role_dict.items():
+            _pct = Participant.query.filter_by(name=k).first()
+            # TODO: risky query
+            # join(Study).filter(Participant.name == k).filter(Study.name == study_name).first()
+            if not _pct:
+                return None
+            _pct_role = ParticipantRole(role=v, exp_id=_exp.id, pct_id=_pct.id)
+        _exp.participant_roles.append(_pct_role)
         db.session.add(_exp)
         db.session.commit()
         return _exp

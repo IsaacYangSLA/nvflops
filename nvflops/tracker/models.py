@@ -78,6 +78,8 @@ class Submission(db.Model):
         backref=db.backref("children"),
     )
     custom_field_list = db.relationship("SubmissionCustomField", lazy=True, backref=db.backref("submission"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
     def asdict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
