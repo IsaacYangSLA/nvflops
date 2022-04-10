@@ -177,13 +177,14 @@ class PlanAdm:
         adm_tuple = (project_name, study_name, "")
         _exp = get_exp_by_key_tuple(exp_name, *adm_tuple)
         _eff_time = datetime.fromisoformat(kwargs.get("effective_time"))
-        plan = Plan(name=plan_name, effective_time=_eff_time, exp_id=_exp.id)
+        _action = kwargs.get("action")
+        plan = Plan(name=plan_name, effective_time=_eff_time, exp_id=_exp.id, action=_action)
         db.session.add(plan)
         db.session.commit()
         return plan
 
     @staticmethod
-    def get_last_plan(exp_name, study_name, project_name):
+    def get_current_plan(exp_name, study_name, project_name):
         _exp = get_exp_by_key_tuple(exp_name, *(project_name, study_name, ""))
         if not _exp:
             return None
@@ -215,8 +216,8 @@ class ExpAdm:
         return _exp
 
     @staticmethod
-    def get_current_exp(study):
-        _study = Study.query.filter_by(name=study).first()
+    def get_current_exp(study, pct):
+        _study = Study.query.filter_by(name=study).join(Participant).filter(Participant.name == pct).first()
         if not _study:
             return None
         _exp = Experiment.query.filter_by(study_id=_study.id).order_by(Experiment.id.asc()).first()
@@ -225,17 +226,17 @@ class ExpAdm:
 
 class VitalSignManager:
     @staticmethod
-    def store_new_entry(project, study, participant, **kwargs):
-        # TODO: need to check if user is in project/study
-        _participant = Participant.query.filter_by(name=participant).first()
+    def insert_entry(*key_tuple, **kwargs):
+        _pct = get_pct_by_key_tuple(*key_tuple)
+        if not _pct:
+            return None
         _custom_field = kwargs.pop("vital_sign", {})
-        _vital_sign = VitalSign(participant_id=_participant.id)
+        _vital_sign = VitalSign(participant_id=_pct.id)
         db.session.add(_vital_sign)
-        db.session.commit()
         for k, v in _custom_field.items():
             _cf = VitalSignCustomField(
                 key_name=k, value_type=v.__class__.__name__, value_string=str(v), vital_sign_id=_vital_sign.id
             )
             db.session.add(_cf)
-            db.session.commit()
+        db.session.commit()
         return _vital_sign

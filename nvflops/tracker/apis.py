@@ -4,6 +4,7 @@ from .managers import (
     CertAdm,
     PlanAdm,
     StudyAdm,
+    ExpAdm,
     SubmissionManager,
     SystemManager,
     VitalSignManager,
@@ -138,10 +139,16 @@ def vital_sign():
     if not pct:
         return jsonify({"status": "error"})
     req = request.json
-    result = VitalSignManager.store_new_entry(project=project, study=study, participant=pct, **req)
+    key_tuple = (
+        project,
+        study,
+        pct,
+    )
+    result = VitalSignManager.insert_entry(*key_tuple, **req)
     if result is None:
         return jsonify({"status": "error"})
-    result = PlanManager.get_last_plan(project=project, study=study)
+    exp = ExpAdm.get_current_exp(study, pct)
+    result = PlanAdm.get_current_plan(exp.name, study_name=study, project_name=project)
     if result is None:
         return jsonify({"status": "error", "plan": None})
     return jsonify({"status": "success", "plan": result})

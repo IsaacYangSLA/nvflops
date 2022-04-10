@@ -68,5 +68,9 @@ sub = SubmissionManager.insert_entry("exp1", *key_tuple, parent_id_list=[sub.id]
 root_sub = SubmissionManager.get_root("exp1", *key_tuple)
 print(root_sub)
 
-plan = PlanAdm.insert_entry("plan1", "exp1", "study1", "proj1", **{"effective_time": "2022-04-08"})
+plan = PlanAdm.insert_entry("plan1", "exp1", "study1", "proj1", **{"effective_time": "2022-04-08", "action": "wait"})
 print(plan)
+
+vital_sign_reply = VitalSignManager.insert_entry(*key_tuple, **{"status": "very happy"})
+result = PlanAdm.get_current_plan(e1.name, study_name="study1", project_name="proj1")
+print(result.asdict())
