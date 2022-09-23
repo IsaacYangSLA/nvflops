@@ -1,7 +1,5 @@
-import datetime
 import io
 import random
-import uuid
 import minio
 
 from typing import Any, Dict, Optional
@@ -39,14 +37,14 @@ def get_all(api_end_point):
 random_keys = ["foo", "bar", "abc", "xyz"]
 random_values = [1, 1.0, "value", True]
 for i in range(30):
-    all_submission = get_all("http://tinylaptop:8000/api/v1/submission").get("submission_list")
+    all_submission = get_all("http://127.0.0.1:8000/api/v1/submission").get("submission_list")
     all_id = [sub["id"] for sub in all_submission]
     all_id_len = len(all_id)
     samples = random.randint(0, all_id_len)
     custom_field = dict()
     for j in random.sample(random_keys, random.randint(0, 4)):
         custom_field[j] = random_values[random.randint(0, 3)]
-    payload = dict(parent_id_list=random.sample(all_id, samples), custom_field=custom_field, creator=["foo", "bar"][random.randint(0, 1)])
+    payload = dict(parent_id_list=random.sample(all_id, samples), custom_field=custom_field, subject=["foo", "bar"][random.randint(0, 1)])
     response = submit_meta(api_end_point, payload=payload)
     my_submission = response.get("submission")
     my_submission_id = my_submission.get("id")
